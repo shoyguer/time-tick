@@ -1,3 +1,3 @@
-plugin_name
+time_tick
 GODOT_VERSION_GOES_HERE
 GODOT_ENGINE_PATH_GOES_HERE
