@@ -23,6 +23,7 @@ void TimeTick::initialize(double tick_duration) {
 	time_scale = 1.0;
 	initialized = true;
 	time_units.clear();
+	unit_counters.clear();
 	
 	// Connect to SceneTree's physics_frame signal
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
@@ -36,14 +37,14 @@ void TimeTick::initialize(double tick_duration) {
 	}
 }
 
-void TimeTick::register_time_unit(const String &unit_name, const String &parent_unit, int threshold, int step_amount, int starting_value) {
+void TimeTick::register_time_unit(const String &unit_name, const String &tracked_unit, int trigger_count, int step_amount, int max_value, int starting_value) {
 	if (unit_name.is_empty()) {
 		UtilityFunctions::push_error("TimeTick: Unit name cannot be empty");
 		return;
 	}
 	
-	if (threshold <= 0) {
-		UtilityFunctions::push_error("TimeTick: Threshold must be positive");
+	if (trigger_count <= 0) {
+		UtilityFunctions::push_error("TimeTick: Trigger count must be positive");
 		return;
 	}
 	
@@ -51,11 +52,17 @@ void TimeTick::register_time_unit(const String &unit_name, const String &parent_
 	Dictionary time_unit;
 	time_unit["name"] = unit_name;
 	time_unit["current_value"] = starting_value;
-	time_unit["parent_unit"] = parent_unit;
-	time_unit["threshold"] = threshold;
+	time_unit["tracked_unit"] = tracked_unit;
+	time_unit["trigger_count"] = trigger_count;
 	time_unit["step_amount"] = step_amount;
+	time_unit["max_value"] = max_value;
 	
 	time_units[unit_name] = time_unit;
+	
+	// Initialize counter for this unit
+	if (!unit_counters.has(unit_name)) {
+		unit_counters[unit_name] = 0;
+	}
 }
 
 void TimeTick::unregister_time_unit(const String &unit_name) {
@@ -178,6 +185,7 @@ bool TimeTick::is_paused() const {
 void TimeTick::reset() {
 	current_tick = 0;
 	accumulated_time = 0.0;
+	unit_counters.clear();
 	
 	Array keys = time_units.keys();
 	for (int i = 0; i < keys.size(); i++) {
@@ -185,6 +193,7 @@ void TimeTick::reset() {
 		Dictionary time_unit = time_units[unit_name];
 		time_unit["current_value"] = 0;
 		time_units[unit_name] = time_unit;
+		unit_counters[unit_name] = 0;
 	}
 }
 
@@ -238,50 +247,96 @@ void TimeTick::_process_tick(double delta) {
 		accumulated_time -= tick_time;
 		current_tick += 1;
 		
-		// Update time hierarchy
-		_update_time_units("tick");
+		// Increment the "tick" unit
+		_increment_unit("tick");
 		
 		// Emit signal
 		emit_signal("tick_updated", current_tick);
 	}
 }
 
-void TimeTick::_update_time_units(const String &parent_unit) {
-	// Find all units that depend on this parent
+void TimeTick::_increment_unit(const String &unit_name) {
+	// Find all units that track this unit
 	Array keys = time_units.keys();
 	
 	for (int i = 0; i < keys.size(); i++) {
-		String unit_name = keys[i];
-		Dictionary time_unit = time_units[unit_name];
+		String child_unit_name = keys[i];
+		Dictionary time_unit = time_units[child_unit_name];
 		
-		String current_parent = time_unit["parent_unit"];
-		if (current_parent == parent_unit) {
-			int old_value = time_unit["current_value"];
-			int step = time_unit["step_amount"];
-			int threshold = time_unit["threshold"];
-			int new_value = old_value + step;
-			
-			// Check if this unit has overflowed its threshold
-			while (new_value >= threshold) {
-				new_value -= threshold;
-				// Trigger child units that depend on this one
-				_update_time_units(unit_name);
+		String tracked = time_unit["tracked_unit"];
+		if (tracked == unit_name) {
+			// Get or initialize the counter for THIS CHILD UNIT
+			// Counter tracks how much the parent has accumulated (in parent's step units)
+			int counter = 0;
+			if (unit_counters.has(child_unit_name)) {
+				counter = unit_counters[child_unit_name];
 			}
 			
-			// Handle negative values (countdown)
-			while (new_value < 0) {
-				new_value += threshold;
-				// Trigger child units
-				_update_time_units(unit_name);
+			// Get the parent's step amount to know how much to add to counter
+			int parent_step = 1;
+			if (time_units.has(unit_name)) {
+				Dictionary parent_unit = time_units[unit_name];
+				parent_step = parent_unit["step_amount"];
 			}
 			
-			// Update the value
-			time_unit["current_value"] = new_value;
-			time_units[unit_name] = time_unit;
+			counter += parent_step;  // Add parent's step, not just 1!
 			
-			// Emit change signal
-			if (old_value != new_value) {
-				emit_signal("time_unit_changed", unit_name, new_value, old_value);
+			int trigger_count = time_unit["trigger_count"];
+			
+			// DEBUG
+			if (child_unit_name == "minute") {
+				UtilityFunctions::print(vformat("[DEBUG] minute counter: %d/%d (parent_step=%d)", 
+					counter, trigger_count, parent_step));
+			}
+			
+			// Check if we've accumulated enough to trigger
+			if (counter >= trigger_count) {
+				// Reset counter (or subtract trigger_count to handle overflow)
+				counter -= trigger_count;
+				unit_counters[child_unit_name] = counter;
+				
+				int old_value = time_unit["current_value"];
+				int step = time_unit["step_amount"];
+				int max_value = time_unit["max_value"];
+				int new_value = old_value + step;
+				
+				// Count how many times we overflow/wrap
+				int overflow_count = 0;
+				
+				// Handle wrapping if max_value is set
+				if (max_value > 0) {
+					while (new_value >= max_value) {
+						new_value -= max_value;
+						overflow_count++;
+					}
+					while (new_value < 0) {
+						new_value += max_value;
+					}
+				}
+				
+				// Update the value
+				time_unit["current_value"] = new_value;
+				time_units[child_unit_name] = time_unit;
+				
+				// Emit change signal
+				if (old_value != new_value) {
+					emit_signal("time_unit_changed", child_unit_name, new_value, old_value);
+				}
+				
+				// ALWAYS trigger children when this unit increments
+				_increment_unit(child_unit_name);
+				
+				// If we overflowed, trigger additional times for each overflow beyond the first
+				if (max_value > 0 && overflow_count > 1) {
+					UtilityFunctions::print(vformat("[DEBUG] %s overflowed %d times (additional triggers)", 
+						child_unit_name, overflow_count - 1));
+					for (int j = 1; j < overflow_count; j++) {
+						_increment_unit(child_unit_name);
+					}
+				}
+			} else {
+				// Update the counter (not yet triggered)
+				unit_counters[child_unit_name] = counter;
 			}
 		}
 	}
@@ -299,8 +354,8 @@ void TimeTick::_bind_methods() {
 	
 	// Methods
 	ClassDB::bind_method(D_METHOD("initialize", "tick_duration"), &TimeTick::initialize, DEFVAL(1.0));
-	ClassDB::bind_method(D_METHOD("register_time_unit", "unit_name", "parent_unit", "threshold", "step_amount", "starting_value"), 
-		&TimeTick::register_time_unit, DEFVAL(1), DEFVAL(1), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("register_time_unit", "unit_name", "tracked_unit", "trigger_count", "step_amount", "max_value", "starting_value"), 
+		&TimeTick::register_time_unit, DEFVAL(1), DEFVAL(1), DEFVAL(-1), DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("unregister_time_unit", "unit_name"), &TimeTick::unregister_time_unit);
 	ClassDB::bind_method(D_METHOD("set_time_unit_step", "unit_name", "step_amount"), &TimeTick::set_time_unit_step);
 	ClassDB::bind_method(D_METHOD("get_time_unit", "unit_name"), &TimeTick::get_time_unit);

@@ -16,19 +16,24 @@ func _ready() -> void:
 	# Initialize with tick duration (0.5 seconds = faster for testing)
 	time_tick.initialize(0.5)
 	
-	# Build time hierarchy: tick -> second -> minute -> hour -> day
-	# Parameters: (unit_name, parent_unit, threshold, step_amount, starting_value)
-	time_tick.register_time_unit("second", "tick", 60, 5)       # Max 60, add 5 per tick
-	time_tick.register_time_unit("minute", "second", 60)        # Max 60, add 1 per overflow
-	time_tick.register_time_unit("hour", "minute", 60)          # Max 60, add 1 per overflow
-	time_tick.register_time_unit("day", "hour", 24, 1, 1)       # Max 24, start at day 1
+	# Build time hierarchy using the new API
+	# Parameters: (unit_name, tracked_unit, trigger_count, step_amount, max_value, starting_value)
+	# Each unit tracks another unit and increments when trigger_count is reached
+	
+	# For wrapping units (max_value > 0): children count OVERFLOWS
+	# For non-wrapping units (max_value <= 0): children count INCREMENTS
+	
+	time_tick.register_time_unit("second", "tick", 1, 15, 60)    # 1 tick = 1 second, wraps at 60
+	time_tick.register_time_unit("minute", "second", 60, 15, 60)  # Every 60 second (regardless of step!), wraps at 60
+	time_tick.register_time_unit("hour", "minute", 60, 12, 24)    # Every 60 minute, wraps at 24
+	time_tick.register_time_unit("day", "hour", 24, 1, -1, 1)    # Every 24 hour, no wrap, start at 1
 	
 	# Connect to signals for updates
 	time_tick.tick_updated.connect(_on_tick_updated)
 	time_tick.time_unit_changed.connect(_on_time_unit_changed)
 	
 	print("Time system initialized!")
-	print("Each tick adds 5 seconds (12 ticks = 1 minute)")
+	print("Standard time: seconds -> minutes -> hours -> days")
 	print("Watch the console for time updates...")
 
 

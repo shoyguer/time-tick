@@ -5,29 +5,35 @@
 	</brief_description>
 	<description>
 		A highly modular time tick system with customizable time hierarchies.
-		Allows you to define custom time units with any names and relationships. Perfect for creating day/night cycles, custom calendars, countdown timers, or any time-based game mechanics.
+		Allows you to define custom time units with any names and relationships. Each unit tracks another unit and increments when that unit reaches a certain count. This enables complex scenarios like having both "month" and "year" track "day" with different trigger counts.
+		Perfect for creating day/night cycles, custom calendars, countdown timers, or any time-based game mechanics.
 		Examples:
-		- "minute" increases every 60 "seconds"
-		- "day" increases every 24 "hours"
-		- "lunar_cycle" increases every 29 "days"
+		- "minute" tracks "tick" and increments every 60 ticks
+		- "hour" tracks "minute" and increments every 60 minutes
+		- "month" tracks "day" and increments every 30 days
+		- "year" tracks "day" and increments every 365 days (independent of month!)
 		[codeblock]
 		var time_tick = TimeTick.new()
 		# 1 tick per second
 		# 2 ticks per second would be: initialize(0.5)
 		# This means every half a second, a tick occurs.
 		time_tick.initialize(1.0)
-		# 60 ticks = 1 minute
-		time_tick.register_time_unit("minute", "tick", 60)
-		# 60 minutes = 1 hour. Start at 14
-		# The fourth parameter is step_amount (default 1), the fifth is starting_value (default 0)
-		time_tick.register_time_unit("hour", "minute", 60, 1, 14)
-		# 24 hours = 1 day. Start at day 5
-		time_tick.register_time_unit("day", "hour", 24, 1, 5)
+
+		# Build time hierarchy using tracking system
+		# Parameters: (unit_name, tracked_unit, trigger_count, step_amount, max_value, starting_value)
+		time_tick.register_time_unit("second", "tick", 1, 1, 60)        # 1 tick = 1 second, wraps at 60
+		time_tick.register_time_unit("minute", "second", 60, 1, 60)     # 60 seconds = 1 minute, wraps at 60
+		time_tick.register_time_unit("hour", "minute", 60, 1, 24, 14)   # 60 minutes = 1 hour, wraps at 24, starts at 14
+		time_tick.register_time_unit("day", "hour", 24, 1, -1, 1)       # 24 hours = 1 day, no wrap, starts at 1
+
+		# Multiple units can track the same unit with different counts!
+		time_tick.register_time_unit("month", "day", 30, 1, 12)         # 30 days = 1 month, wraps at 12
+		time_tick.register_time_unit("year", "day", 365)                # 365 days = 1 year, no wrap
+
 		# Or set starting values after registration:
-		# Set to 14:30
 		time_tick.set_time_units({"hour": 14, "minute": 30})
-		# Each tick adds 5 minutes instead of 1
-		time_tick.set_time_unit_step("minute", 5)
+		# Speed up or slow down time
+		time_tick.set_time_unit_step("minute", 5)  # Each tick adds 5 minutes
 		time_tick.tick_updated.connect(_on_tick)
 		[/codeblock]
 	</description>
@@ -122,18 +128,20 @@
 		<method name="register_time_unit">
 			<return type="void" />
 			<param index="0" name="unit_name" type="String" />
-			<param index="1" name="parent_unit" type="String" />
-			<param index="2" name="threshold" type="int" default="1" />
+			<param index="1" name="tracked_unit" type="String" />
+			<param index="2" name="trigger_count" type="int" default="1" />
 			<param index="3" name="step_amount" type="int" default="1" />
-			<param index="4" name="starting_value" type="int" default="0" />
+			<param index="4" name="max_value" type="int" default="-1" />
+			<param index="5" name="starting_value" type="int" default="0" />
 			<description>
 				Registers a new time unit in the time hierarchy.
-				[param unit_name] is the name of this time unit (e.g., "minute", "hour", "day"). Cannot be empty.
-				[param parent_unit] is the unit that triggers this one to increment (e.g., "tick", "minute", "hour").
-				[param threshold] is the maximum value before overflow (e.g., 60 for seconds/minutes). Must be positive.
-				[param step_amount] is how much to add per parent increment. Can be negative to count down (default is 1).
+				[param unit_name] is the name of this time unit (e.g., "minute", "hour", "month", "year"). Cannot be empty.
+				[param tracked_unit] is the unit we're counting (e.g., "minute" tracks "tick", "month" tracks "day").
+				[param trigger_count] is how many of tracked_unit before incrementing (e.g., 60 ticks = 1 minute, 30 days = 1 month). Must be positive.
+				[param step_amount] is how much to add when triggered. Can be negative to count down (default is 1).
+				[param max_value] is the maximum value before wrapping to 0 (e.g., 24 for hours, 12 for months, -1 for unlimited). Default is -1 (no wrap).
 				[param starting_value] is the optional initial value for this time unit (default is 0).
-				When a time unit reaches its threshold, it resets to 0 and triggers any child units that depend on it.
+				Multiple units can track the same unit with different trigger counts, enabling complex scenarios like having both "month" (tracks every 30 days) and "year" (tracks every 365 days) monitor "day" independently.
 			</description>
 		</method>
 		<method name="reset">
