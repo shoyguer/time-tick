@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="TimeTick" inherits="RefCounted" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A highly modular time tick system with customizable time hierarchies.
+		A time tick system, with customizable time hierarchies.
 	</brief_description>
 	<description>
-		A highly modular time tick system with customizable time hierarchies.
 		Allows you to define custom time units with any names and relationships. Each unit tracks another unit and increments when that unit reaches a certain count. This enables complex scenarios like having both "month" and "year" track "day" with different trigger counts.
 		Perfect for creating day/night cycles, custom calendars, countdown timers, or any time-based game mechanics.
 		Examples:
@@ -12,6 +11,7 @@
 		- "hour" tracks "minute" and increments every 60 minutes
 		- "month" tracks "day" and increments every 30 days
 		- "year" tracks "day" and increments every 365 days (independent of month!)
+
 		[codeblock]
 		var time_tick = TimeTick.new()
 		# 1 tick per second
@@ -20,18 +20,27 @@
 		time_tick.initialize(1.0)
 
 		# Build time hierarchy using tracking system
-		# Parameters: (unit_name, tracked_unit, trigger_count, step_amount, max_value, starting_value)
-		time_tick.register_time_unit("second", "tick", 1, 1, 60)        # 1 tick = 1 second, wraps at 60
-		time_tick.register_time_unit("minute", "second", 60, 1, 60)     # 60 seconds = 1 minute, wraps at 60
-		time_tick.register_time_unit("hour", "minute", 60, 1, 24, 14)   # 60 minutes = 1 hour, wraps at 24, starts at 14
-		time_tick.register_time_unit("day", "hour", 24, 1, -1, 1)       # 24 hours = 1 day, no wrap, starts at 1
+		# Parameters: (unit_name, tracked_unit, trigger_count, max_value, min_value)
+
+		# 1 tick = 1 second, wraps 0-59
+		time_tick.register_time_unit("second", "tick", 1, 60, 0)    
+		# 60 seconds = 1 minute, wraps 0-59
+		time_tick.register_time_unit("minute", "second", 60, 60, 0) 
+		# 60 minutes = 1 hour, wraps 0-23
+		time_tick.register_time_unit("hour", "minute", 60, 24, 0) 
+		# 24 hours = 1 day, wraps 1-31 (starts at 1)
+		time_tick.register_time_unit("day", "hour", 24, 32, 1)
 
 		# Multiple units can track the same unit with different counts!
-		time_tick.register_time_unit("month", "day", 30, 1, 12)         # 30 days = 1 month, wraps at 12
-		time_tick.register_time_unit("year", "day", 365)                # 365 days = 1 year, no wrap
 
-		# Or set starting values after registration:
-		time_tick.set_time_units({"hour": 14, "minute": 30})
+		# 30 days = 1 month, wraps 1-12 (starts at 1)
+		time_tick.register_time_unit("month", "day", 30, 13, 1)
+		# 365 days = 1 year, no wrap      
+		time_tick.register_time_unit("year", "day", 365)
+
+		# Set starting values after registration if needed:
+		time_tick.set_time_unit_starting_value("hour", 14)
+		time_tick.set_time_unit_starting_value("minute", 30)
 		# Speed up or slow down time
 		time_tick.set_time_unit_step("minute", 5)  # Each tick adds 5 minutes
 		time_tick.tick_updated.connect(_on_tick)
@@ -83,6 +92,13 @@
 				[code]1.0[/code] is normal speed, [code]2.0[/code] is double speed, [code]0.5[/code] is half speed, etc.
 			</description>
 		</method>
+		<method name="get_tick_duration" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the tick duration in real-time seconds (the time between each tick).
+				This is the value set in [method initialize] or [method set_tick_duration].
+			</description>
+		</method>
 		<method name="get_time_unit" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="unit_name" type="String" />
@@ -91,10 +107,46 @@
 				If the time unit does not exist, returns 0.
 			</description>
 		</method>
+		<method name="get_time_unit_data" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="unit_name" type="String" />
+			<description>
+				Returns a dictionary containing all the data for the specified time unit.
+				The dictionary includes keys like "name", "current_value", "tracked_unit", "trigger_count", "step_amount", "max_value", and "min_value".
+				If the time unit does not exist, returns an empty dictionary.
+				This is useful for inspecting or debugging time unit configurations.
+			</description>
+		</method>
 		<method name="get_time_unit_names" qualifiers="const">
 			<return type="String[]" />
 			<description>
 				Returns an array containing the names of all registered time units.
+			</description>
+		</method>
+		<method name="get_time_unit_starting_value" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="unit_name" type="String" />
+			<description>
+				Returns the starting value (minimum value for wrapping) of the specified time unit.
+				This is the value the unit will wrap back to when it exceeds [code]max_value[/code].
+				If the time unit does not exist or doesn't have a min_value set, returns 0.
+			</description>
+		</method>
+		<method name="get_time_unit_step" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="unit_name" type="String" />
+			<description>
+				Returns the step amount of the specified time unit (how much it increases per parent tick).
+				If the time unit does not exist, returns 0.
+			</description>
+		</method>
+		<method name="get_time_unit_trigger_count" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="unit_name" type="String" />
+			<description>
+				Returns the trigger count of the specified time unit (how many of the tracked unit are needed to trigger an increment).
+				Returns -1 for complex time units (those registered with [method register_complex_time_unit]).
+				If the time unit does not exist, returns 0.
 			</description>
 		</method>
 		<method name="initialize">
@@ -104,6 +156,7 @@
 				Initializes the TimeTick system with the specified tick duration in real-time seconds.
 				This must be called before using the time system. Resets all time units and tick count to zero.
 				[param tick_duration] is the time in seconds for each tick to update (default is 1.0 second per tick).
+				Valid range: 0.001 to 600.0 seconds. Values outside this range will be clamped.
 			</description>
 		</method>
 		<method name="is_initialized" qualifiers="const">
@@ -125,22 +178,43 @@
 				Useful for pause menus or freezing time during cutscenes.
 			</description>
 		</method>
+		<method name="register_complex_time_unit">
+			<return type="void" />
+			<param index="0" name="unit_name" type="String" />
+			<param index="1" name="tracked_units" type="Dictionary" />
+			<param index="2" name="max_value" type="int" default="-1" />
+			<param index="3" name="min_value" type="int" default="0" />
+			<description>
+				Registers a complex time unit that tracks multiple units with specific values.
+				A complex unit only increments when ALL tracked units reach their specified values simultaneously.
+				This is useful for creating precise timing events that depend on multiple conditions.
+				[param unit_name] is the name of this complex time unit (e.g., "sidereal_day", "lunar_month"). Cannot be empty.
+				[param tracked_units] is a Dictionary mapping unit names to their trigger values (e.g., {"hour": 23, "minute": 56, "second": 4} for a sidereal day).
+				[param max_value] is the maximum value (exclusive) before wrapping to [param min_value] (-1 for unlimited). For example, max_value of 60 allows values 0-59. Default is -1 (no wrap).
+				[param min_value] is the minimum value to wrap to when reaching [param max_value]. Use 0 for units like seconds/minutes/hours, use 1 for units like days/months that should wrap to 1 instead of 0. Default is 0. Also serves as the starting value.
+				[b]Note:[/b] [code]step_amount[/code] defaults to 1 and [code]starting_value[/code] defaults to [param min_value]. Use [method set_time_unit_step] and [method set_time_unit_starting_value] to change these after registration if needed.
+				When all conditions are met, the complex unit increments. The tracked units continue their normal progression and are not reset.
+				Example use cases:
+				- Sidereal day: triggers at exactly 23 hours, 56 minutes, 4 seconds
+				- Lunar month: triggers at 29 days, 12 hours, 44 minutes, 3 seconds
+				- Game events: trigger at specific times like dawn (6:30:20) or dusk (18:15:30)
+			</description>
+		</method>
 		<method name="register_time_unit">
 			<return type="void" />
 			<param index="0" name="unit_name" type="String" />
 			<param index="1" name="tracked_unit" type="String" />
 			<param index="2" name="trigger_count" type="int" default="1" />
-			<param index="3" name="step_amount" type="int" default="1" />
-			<param index="4" name="max_value" type="int" default="-1" />
-			<param index="5" name="starting_value" type="int" default="0" />
+			<param index="3" name="max_value" type="int" default="-1" />
+			<param index="4" name="min_value" type="int" default="0" />
 			<description>
 				Registers a new time unit in the time hierarchy.
 				[param unit_name] is the name of this time unit (e.g., "minute", "hour", "month", "year"). Cannot be empty.
 				[param tracked_unit] is the unit we're counting (e.g., "minute" tracks "tick", "month" tracks "day").
 				[param trigger_count] is how many of tracked_unit before incrementing (e.g., 60 ticks = 1 minute, 30 days = 1 month). Must be positive.
-				[param step_amount] is how much to add when triggered. Can be negative to count down (default is 1).
-				[param max_value] is the maximum value before wrapping to 0 (e.g., 24 for hours, 12 for months, -1 for unlimited). Default is -1 (no wrap).
-				[param starting_value] is the optional initial value for this time unit (default is 0).
+				[param max_value] is the maximum value (exclusive) before wrapping to [param min_value]. For example, 60 for seconds/minutes (allows 0-59), 24 for hours (allows 0-23), 13 for months with [param min_value]=1 (allows 1-12), -1 for unlimited. Default is -1 (no wrap).
+				[param min_value] is the minimum value to wrap to when reaching [param max_value]. Use 0 for units like seconds/minutes/hours, use 1 for units like days/months that should wrap to 1 instead of 0. Default is 0. Also serves as the starting value.
+				[b]Note:[/b] [code]step_amount[/code] defaults to 1 and [code]starting_value[/code] defaults to [param min_value]. Use [method set_time_unit_step] and [method set_time_unit_starting_value] to change these after registration if needed.
 				Multiple units can track the same unit with different trigger counts, enabling complex scenarios like having both "month" (tracks every 30 days) and "year" (tracks every 365 days) monitor "day" independently.
 			</description>
 		</method>
@@ -163,12 +237,24 @@
 			<param index="0" name="scale" type="float" />
 			<description>
 				Sets the time scale multiplier to control the speed of time progression.
-				[param scale] must be 0.0 or greater. Values less than 0.0 will be clamped to 0.0.
+				[param scale] is clamped to the range -1000.0 to 1000.0.
 				Examples:
-				- 1.0 = normal speed
-				- 2.0 = double speed
-				- 0.5 = half speed
-				- 0.0 = frozen (similar to pause)
+				- 1.0 = normal speed (forward)
+				- 2.0 = double speed (forward)
+				- 0.5 = half speed (forward)
+				- 0.0 = frozen (similar to [method pause])
+				- -1.0 = normal speed (backward)
+				- -2.0 = double speed (backward)
+				[b]Note:[/b] Negative values reverse time. The tick count will decrement instead of increment, and time units will count backward.
+			</description>
+		</method>
+		<method name="set_tick_duration">
+			<return type="void" />
+			<param index="0" name="duration" type="float" />
+			<description>
+				Sets the tick duration in real-time seconds (the time between each tick).
+				[param duration] is clamped to the range 0.001 to 600.0 seconds.
+				This allows you to dynamically change the tick rate without reinitializing the system.
 			</description>
 		</method>
 		<method name="set_time_unit">
@@ -182,6 +268,17 @@
 				This is useful for loading saved game time or jumping to a specific time.
 			</description>
 		</method>
+		<method name="set_time_unit_starting_value">
+			<return type="void" />
+			<param index="0" name="unit_name" type="String" />
+			<param index="1" name="starting_value" type="int" />
+			<description>
+				Sets the starting value (minimum value for wrapping) of a time unit.
+				This value determines where the unit wraps back to when it exceeds [code]max_value[/code].
+				For example, if hours have a starting_value of 1 and max_value of 24, they will wrap from 24 back to 1 instead of 0.
+				Prints an error if the time unit does not exist.
+			</description>
+		</method>
 		<method name="set_time_unit_step">
 			<return type="void" />
 			<param index="0" name="unit_name" type="String" />
@@ -190,6 +287,18 @@
 				Sets the step amount for a time unit (how much it increases per parent tick).
 				[param step_amount] can be negative to create countdown behavior.
 				Prints an error if the time unit does not exist.
+			</description>
+		</method>
+		<method name="set_time_unit_trigger_count">
+			<return type="void" />
+			<param index="0" name="unit_name" type="String" />
+			<param index="1" name="trigger_count" type="int" />
+			<description>
+				Sets the trigger count for a time unit (how many of the tracked unit are needed to trigger an increment).
+				[param trigger_count] must be positive (greater than 0).
+				Cannot be used on complex time units (those registered with [method register_complex_time_unit]).
+				Prints an error if the time unit does not exist or if trigger_count is not positive.
+				This is useful for dynamically changing time progression, such as speeding up or slowing down specific units.
 			</description>
 		</method>
 		<method name="set_time_units">
