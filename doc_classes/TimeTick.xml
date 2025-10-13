@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TimeTick" inherits="RefCounted" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A highly modular time tick system with customizable time hierarchies.
+	</brief_description>
+	<description>
+		A highly modular time tick system with customizable time hierarchies.
+		Allows you to define custom time units with any names and relationships. Perfect for creating day/night cycles, custom calendars, countdown timers, or any time-based game mechanics.
+		Examples:
+		- "minute" increases every 60 "seconds"
+		- "day" increases every 24 "hours"
+		- "lunar_cycle" increases every 29 "days"
+		[codeblock]
+		var time_tick = TimeTick.new()
+		# 1 tick per second
+		# 2 ticks per second would be: initialize(0.5)
+		# This means every half a second, a tick occurs.
+		time_tick.initialize(1.0)
+		# 60 ticks = 1 minute
+		time_tick.register_time_unit("minute", "tick", 60)
+		# 60 minutes = 1 hour. Start at 14
+		# The fourth parameter is step_amount (default 1), the fifth is starting_value (default 0)
+		time_tick.register_time_unit("hour", "minute", 60, 1, 14)
+		# 24 hours = 1 day. Start at day 5
+		time_tick.register_time_unit("day", "hour", 24, 1, 5)
+		# Or set starting values after registration:
+		# Set to 14:30
+		time_tick.set_time_units({"hour": 14, "minute": 30})
+		# Each tick adds 5 minutes instead of 1
+		time_tick.set_time_unit_step("minute", 5)
+		time_tick.tick_updated.connect(_on_tick)
+		[/codeblock]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_current_tick" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the current tick count. The tick count increases by 1 each time a tick occurs (based on [code]tick_duration[/code] set in [method initialize]).
+			</description>
+		</method>
+		<method name="get_formatted_time" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="format_string" type="String" />
+			<description>
+				Returns a formatted time string using placeholders for time unit values.
+				Use [code]{unit_name}[/code] placeholders in the format string, which will be replaced with the current values of the corresponding time units.
+				Example: [code]get_formatted_time("Day {day}, {hour}:{minute}")[/code] might return "Day 5, 14:30".
+			</description>
+		</method>
+		<method name="get_formatted_time_padded" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="units" type="String[]" />
+			<param index="1" name="separator" type="String" default="&quot;:&quot;" />
+			<param index="2" name="padding" type="int" default="2" />
+			<description>
+				Returns a formatted time string with zero-padded values.
+				[param units] array specifies which time units to include in order (e.g., ["hour", "minute", "second"]).
+				[param separator] string is placed between each value (default is ":").
+				[param padding] specifies the minimum number of digits for each value (default is 2).
+				Example: [code]get_formatted_time_padded(["hour", "minute"], ":", 2)[/code] might return "05:03" for 5 hours and 3 minutes.
+			</description>
+		</method>
+		<method name="get_tick_progress" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the progress to the next tick as a value between 0.0 and 1.0.
+				This is useful for smooth animations or progress bars that show time progression between ticks.
+				Returns 0.0 if [code]tick_time[/code] is less than or equal to 0.0.
+			</description>
+		</method>
+		<method name="get_time_scale" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the current time scale multiplier.
+				[code]1.0[/code] is normal speed, [code]2.0[/code] is double speed, [code]0.5[/code] is half speed, etc.
+			</description>
+		</method>
+		<method name="get_time_unit" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="unit_name" type="String" />
+			<description>
+				Returns the current value of the specified time unit.
+				If the time unit does not exist, returns 0.
+			</description>
+		</method>
+		<method name="get_time_unit_names" qualifiers="const">
+			<return type="String[]" />
+			<description>
+				Returns an array containing the names of all registered time units.
+			</description>
+		</method>
+		<method name="initialize">
+			<return type="void" />
+			<param index="0" name="tick_duration" type="float" default="1.0" />
+			<description>
+				Initializes the TimeTick system with the specified tick duration in real-time seconds.
+				This must be called before using the time system. Resets all time units and tick count to zero.
+				[param tick_duration] is the time in seconds for each tick to update (default is 1.0 second per tick).
+			</description>
+		</method>
+		<method name="is_initialized" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the system has been initialized with [method initialize], [code]false[/code] otherwise.
+			</description>
+		</method>
+		<method name="is_paused" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the tick system is currently paused, [code]false[/code] otherwise.
+			</description>
+		</method>
+		<method name="pause">
+			<return type="void" />
+			<description>
+				Pauses the tick system. Time will stop progressing until [method resume] is called.
+				Useful for pause menus or freezing time during cutscenes.
+			</description>
+		</method>
+		<method name="register_time_unit">
+			<return type="void" />
+			<param index="0" name="unit_name" type="String" />
+			<param index="1" name="parent_unit" type="String" />
+			<param index="2" name="threshold" type="int" default="1" />
+			<param index="3" name="step_amount" type="int" default="1" />
+			<param index="4" name="starting_value" type="int" default="0" />
+			<description>
+				Registers a new time unit in the time hierarchy.
+				[param unit_name] is the name of this time unit (e.g., "minute", "hour", "day"). Cannot be empty.
+				[param parent_unit] is the unit that triggers this one to increment (e.g., "tick", "minute", "hour").
+				[param threshold] is the maximum value before overflow (e.g., 60 for seconds/minutes). Must be positive.
+				[param step_amount] is how much to add per parent increment. Can be negative to count down (default is 1).
+				[param starting_value] is the optional initial value for this time unit (default is 0).
+				When a time unit reaches its threshold, it resets to 0 and triggers any child units that depend on it.
+			</description>
+		</method>
+		<method name="reset">
+			<return type="void" />
+			<description>
+				Resets the tick system and all time units to zero.
+				The current tick count and all registered time unit values are set back to 0.
+				Accumulated time is also cleared.
+			</description>
+		</method>
+		<method name="resume">
+			<return type="void" />
+			<description>
+				Resumes the tick system after being paused. Time will continue progressing normally.
+			</description>
+		</method>
+		<method name="set_time_scale">
+			<return type="void" />
+			<param index="0" name="scale" type="float" />
+			<description>
+				Sets the time scale multiplier to control the speed of time progression.
+				[param scale] must be 0.0 or greater. Values less than 0.0 will be clamped to 0.0.
+				Examples:
+				- 1.0 = normal speed
+				- 2.0 = double speed
+				- 0.5 = half speed
+				- 0.0 = frozen (similar to pause)
+			</description>
+		</method>
+		<method name="set_time_unit">
+			<return type="void" />
+			<param index="0" name="unit_name" type="String" />
+			<param index="1" name="value" type="int" />
+			<description>
+				Sets the value of a specific time unit directly.
+				Emits the [signal time_unit_changed] signal if the value changes.
+				Prints an error if the time unit does not exist.
+				This is useful for loading saved game time or jumping to a specific time.
+			</description>
+		</method>
+		<method name="set_time_unit_step">
+			<return type="void" />
+			<param index="0" name="unit_name" type="String" />
+			<param index="1" name="step_amount" type="int" />
+			<description>
+				Sets the step amount for a time unit (how much it increases per parent tick).
+				[param step_amount] can be negative to create countdown behavior.
+				Prints an error if the time unit does not exist.
+			</description>
+		</method>
+		<method name="set_time_units">
+			<return type="void" />
+			<param index="0" name="values" type="Dictionary" />
+			<description>
+				Sets multiple time unit values at once using a dictionary.
+				The dictionary should map unit names to their starting values (e.g., {"day": 5, "hour": 14, "minute": 30}).
+				This is more efficient than calling [method set_time_unit] multiple times.
+				Emits [signal time_unit_changed] for each unit that changes.
+			</description>
+		</method>
+		<method name="shutdown">
+			<return type="void" />
+			<description>
+				Cleans up the object by clearing all time units and marks the system as uninitialized.
+				Should be called when the TimeTick instance is no longer needed.
+			</description>
+		</method>
+		<method name="toggle_pause">
+			<return type="void" />
+			<description>
+				Toggles the pause state of the tick system. If currently paused, it will resume. If currently running, it will pause.
+			</description>
+		</method>
+		<method name="unregister_time_unit">
+			<return type="void" />
+			<param index="0" name="unit_name" type="String" />
+			<description>
+				Unregisters and removes a time unit from the system. The time unit will no longer be tracked or updated.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="tick_updated">
+			<param index="0" name="current_tick" type="int" />
+			<description>
+				Emitted whenever a tick passes (based on the tick duration set in [method initialize]).
+				[param current_tick] is the current tick count after the update.
+			</description>
+		</signal>
+		<signal name="time_unit_changed">
+			<param index="0" name="unit_name" type="String" />
+			<param index="1" name="new_value" type="int" />
+			<param index="2" name="old_value" type="int" />
+			<description>
+				Emitted when a time unit's value changes (e.g., minute, hour, day etc).
+				[param unit_name] is the name of the time unit that changed.
+				[param new_value] is the new value of the time unit.
+				[param old_value] is the previous value of the time unit.
+				This signal is useful for triggering events on specific time changes, such as when a new day begins or an hour passes.
+			</description>
+		</signal>
+	</signals>
+</class>
