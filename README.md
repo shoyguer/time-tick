@@ -58,8 +58,8 @@ Check out my other Godot plugins:
 
 | Plugin | Description |
 |--------|-------------|
-| [<img src="https://raw.githubusercontent.com/shoyguer/seed/refs/heads/main/brand/header_image.png" width="128"><br>**Seed**](https://github.com/shoyguer/seed) | Seed generation system |
-| [<img src="https://raw.githubusercontent.com/shoyguer/stat-pool/refs/heads/main/brand/header_image.png" width="128"><br>**StatPool**](https://github.com/shoyguer/stat-pool) | Flexible stat management system (for Health, Mana, Stamina, money etc) |
+| [<img src="https://raw.githubusercontent.com/shoyguer/seed/refs/heads/main/brand/header_image.png" width="128">](https://github.com/shoyguer/seed) | Seed generation system |
+| [<img src="https://raw.githubusercontent.com/shoyguer/stat-pool/refs/heads/main/brand/header_image.png" width="128">](https://github.com/shoyguer/stat-pool) | Flexible stat management system (for Health, Mana, Stamina, money etc) |
 
 ## Support
 If this plugin helped you, please, consider:
