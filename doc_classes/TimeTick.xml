@@ -6,12 +6,7 @@
 	<description>
 		Allows you to define custom time units with any names and relationships. Each unit tracks another unit and increments when that unit reaches a certain count. This enables complex scenarios like having both "month" and "year" track "day" with different trigger counts.
 		Perfect for creating day/night cycles, custom calendars, countdown timers, or any time-based game mechanics.
-		Examples:
-		- "minute" tracks "tick" and increments every 60 ticks
-		- "hour" tracks "minute" and increments every 60 minutes
-		- "month" tracks "day" and increments every 30 days
-		- "year" tracks "day" and increments every 365 days (independent of month!)
-
+		Code example:
 		[codeblock]
 		var time_tick = TimeTick.new()
 		# 1 tick per second
@@ -22,10 +17,8 @@
 		# Build time hierarchy using tracking system
 		# Parameters: (unit_name, tracked_unit, trigger_count, max_value, min_value)
 
-		# 1 tick = 1 second, wraps 0-59
-		time_tick.register_time_unit("second", "tick", 1, 60, 0)    
-		# 60 seconds = 1 minute, wraps 0-59
-		time_tick.register_time_unit("minute", "second", 60, 60, 0) 
+		# 60 ticks = 1 minute, wraps 0-59
+		time_tick.register_time_unit("minute", "tick", 60, 60, 0)
 		# 60 minutes = 1 hour, wraps 0-23
 		time_tick.register_time_unit("hour", "minute", 60, 24, 0) 
 		# 24 hours = 1 day, wraps 1-31 (starts at 1)
@@ -501,6 +494,7 @@
 					time_tick.initialize(1.0)
 					time_tick.tick_updated.connect(_on_tick_updated)
 				
+				# Called every tick with the current tick count
 				func _on_tick_updated(current_tick: int) -> void:
 					print("Tick: ", current_tick)
 				[/codeblock]
@@ -523,6 +517,7 @@
 					time_tick.register_time_unit("hour", "tick", 60, 24, 0)
 					time_tick.time_unit_changed.connect(_on_time_unit_changed)
 				
+				# Called when any time unit changes value
 				func _on_time_unit_changed(unit_name: String, new_value: int, old_value: int) -> void:
 					print(unit_name, ": ", old_value, " -> ", new_value)
 					if unit_name == "hour" and new_value == 0:
