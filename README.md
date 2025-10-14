@@ -55,8 +55,8 @@ Or jump to whatever you need:
 
 ## Other Plugins
 Check out my other Godot plugins:
-- [**Seed**](https://github.com/shoyguer/seed) - Simple random seed generation system
-- [**StatPool**](https://github.com/shoyguer/stat-pool) - Flexible stat management system (for Health, Mana, Stamina, money etc)
+- [<img src="https://raw.githubusercontent.com/shoyguer/seed/refs/heads/main/brand/header_image.png" width="128">](https://github.com/shoyguer/seed) [**Seed**](https://github.com/shoyguer/seed) - Simple random seed generation system
+- [<img src="https://raw.githubusercontent.com/shoyguer/stat-pool/refs/heads/main/brand/header_image.png" width="128">](https://github.com/shoyguer/stat-pool) [**StatPool**](https://github.com/shoyguer/stat-pool) - Flexible stat management system (for Health, Mana, Stamina, money etc)
 
 ## Support
 If this plugin helped you, please, consider:
