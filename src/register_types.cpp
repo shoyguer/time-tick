@@ -1,4 +1,6 @@
-// Include your classes, that you want to expose to Godot
+// MIT License
+// Copyright (c) 2025 Lucas "Shoyguer" Melo
+
 #include "time_tick.hpp"
 
 #include <gdextension_interface.h>
@@ -14,7 +16,6 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 		return;
 	}
 
-	// Register your classes here, so they are available in the Godot editor and engine
 	GDREGISTER_CLASS(TimeTick)
 }
 

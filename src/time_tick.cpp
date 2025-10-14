@@ -1,3 +1,6 @@
+// MIT License
+// Copyright (c) 2025 Lucas "Shoyguer" Melo
+
 #include "time_tick.hpp"
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/time.hpp>

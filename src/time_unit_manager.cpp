@@ -1,3 +1,6 @@
+// MIT License
+// Copyright (c) 2025 Lucas "Shoyguer" Melo
+
 #include "time_unit_manager.hpp"
 #include <godot_cpp/variant/utility_functions.hpp>
 

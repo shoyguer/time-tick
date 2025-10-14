@@ -1,3 +1,6 @@
+// MIT License
+// Copyright (c) 2025 Lucas "Shoyguer" Melo
+
 #pragma once
 
 #include "time_unit_manager.hpp"
