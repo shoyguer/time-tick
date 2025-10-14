@@ -56,7 +56,7 @@ Or jump to whatever you need:
 ## Other Plugins
 Check out my other Godot plugins:
 
-
+___
 
 [<img src="https://raw.githubusercontent.com/shoyguer/seed/refs/heads/main/brand/header_image.png" width="160">](https://github.com/shoyguer/seed) [**Seed**](https://github.com/shoyguer/seed) - Seed generation system.
 
