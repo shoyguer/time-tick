@@ -5,6 +5,10 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 
+// Helper classes
+#include "time_unit_manager.hpp"
+#include "time_unit_processor.hpp"
+
 using namespace godot;
 
 class TimeTick : public RefCounted {
@@ -84,9 +88,9 @@ private:
 	double accumulated_time = 0.0;
 	double last_physics_time = 0.0;
 	
-	// Time units storage
-	Dictionary time_units;
-	Dictionary unit_counters;
+	// Helper classes for internal organization
+	TimeUnitManager unit_manager;
+	TimeUnitProcessor *processor = nullptr;
 	
 	// Status flags
 	bool paused = false;
@@ -98,5 +102,8 @@ private:
 	void _process_tick(double delta);
 	void _increment_unit(const String &unit_name);
 	void _decrement_unit(const String &unit_name);
+	
+	// Signal emission helper (called by processor)
+	void _emit_unit_changed(const String &name, int new_val, int old_val);
 };
 

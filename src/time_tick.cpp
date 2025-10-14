@@ -7,12 +7,15 @@
 using namespace godot;
 
 TimeTick::TimeTick() {
-	// Constructor - initialize default values (already done in header with default member initializers)
+	// Constructor
 }
 
 TimeTick::~TimeTick() {
-	// Cleanup on destruction
 	shutdown();
+	if (processor) {
+		delete processor;
+		processor = nullptr;
+	}
 }
 
 void TimeTick::initialize(double tick_duration) {
@@ -26,15 +29,23 @@ void TimeTick::initialize(double tick_duration) {
 	paused = false;
 	time_scale = 1.0;
 	initialized = true;
-	time_units.clear();
-	unit_counters.clear();
+	
+	// Clear helper classes
+	unit_manager.clear();
+	
+	// Initialize processor with signal callback
+	if (!processor) {
+		processor = new TimeUnitProcessor(&unit_manager);
+	}
+	Callable callback = callable_mp(this, &TimeTick::_emit_unit_changed);
+	processor->set_signal_callback(callback);
 	
 	// Connect to SceneTree's physics_frame signal
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
 	if (tree && !connected_to_physics) {
-		Callable callback = callable_mp(this, &TimeTick::_on_physics_frame);
-		if (!tree->is_connected("physics_frame", callback)) {
-			tree->connect("physics_frame", callback);
+		Callable physics_callback = callable_mp(this, &TimeTick::_on_physics_frame);
+		if (!tree->is_connected("physics_frame", physics_callback)) {
+			tree->connect("physics_frame", physics_callback);
 			connected_to_physics = true;
 		}
 		last_physics_time = Time::get_singleton()->get_ticks_msec() / 1000.0;
@@ -52,22 +63,8 @@ void TimeTick::register_time_unit(const String &unit_name, const String &tracked
 		return;
 	}
 	
-	// Create a Dictionary to store TimeUnit data
-	Dictionary time_unit;
-	time_unit["name"] = unit_name;
-	time_unit["current_value"] = min_value;  // Starting value defaults to min_value
-	time_unit["tracked_unit"] = tracked_unit;
-	time_unit["trigger_count"] = trigger_count;
-	time_unit["step_amount"] = 1;  // Default step_amount is 1
-	time_unit["max_value"] = max_value;
-	time_unit["min_value"] = min_value;
-	
-	time_units[unit_name] = time_unit;
-	
-	// Initialize counter for this unit
-	if (!unit_counters.has(unit_name)) {
-		unit_counters[unit_name] = 0;
-	}
+	// Delegate to manager
+	unit_manager.register_simple_unit(unit_name, tracked_unit, trigger_count, max_value, min_value);
 }
 
 void TimeTick::register_complex_time_unit(const String &unit_name, const Dictionary &tracked_units, int max_value, int min_value) {
@@ -85,48 +82,29 @@ void TimeTick::register_complex_time_unit(const String &unit_name, const Diction
 	Array keys = tracked_units.keys();
 	for (int i = 0; i < keys.size(); i++) {
 		String tracked_unit = keys[i];
-		if (!time_units.has(tracked_unit) && tracked_unit != "tick") {
+		if (!unit_manager.has_unit(tracked_unit) && tracked_unit != "tick") {
 			UtilityFunctions::push_warning(vformat("TimeTick: Tracked unit '%s' not yet registered, make sure to register it first", tracked_unit));
 		}
 	}
 	
-	// Create a Dictionary to store complex TimeUnit data
-	Dictionary time_unit;
-	time_unit["name"] = unit_name;
-	time_unit["current_value"] = min_value;  // Starting value defaults to min_value
-	time_unit["is_complex"] = true;  // Mark this as a complex unit
-	time_unit["tracked_units"] = tracked_units;  // Dictionary of {unit_name: trigger_value}
-	time_unit["step_amount"] = 1;  // Default step_amount is 1
-	time_unit["max_value"] = max_value;
-	time_unit["min_value"] = min_value;
-	
-	time_units[unit_name] = time_unit;
-	
-	// No counter needed for complex units - we check the actual values directly
+	// Delegate to manager
+	unit_manager.register_complex_unit(unit_name, tracked_units, max_value, min_value);
 }
 
 void TimeTick::unregister_time_unit(const String &unit_name) {
-	time_units.erase(unit_name);
+	unit_manager.unregister_unit(unit_name);
 }
 
 void TimeTick::set_time_unit_step(const String &unit_name, int step_amount) {
-	if (time_units.has(unit_name)) {
-		Dictionary time_unit = time_units[unit_name];
-		time_unit["step_amount"] = step_amount;
-		time_units[unit_name] = time_unit;
-	} else {
+	if (!unit_manager.has_unit(unit_name)) {
 		UtilityFunctions::push_error(vformat("TimeTick: Time unit '%s' not found", unit_name));
+		return;
 	}
+	unit_manager.set_step(unit_name, step_amount);
 }
 
 int TimeTick::get_time_unit_step(const String &unit_name) const {
-	if (time_units.has(unit_name)) {
-		Dictionary time_unit = time_units[unit_name];
-		if (time_unit.has("step_amount")) {
-			return time_unit["step_amount"];
-		}
-	}
-	return 0;
+	return unit_manager.get_step(unit_name);
 }
 
 void TimeTick::set_time_unit_trigger_count(const String &unit_name, int trigger_count) {
@@ -135,91 +113,59 @@ void TimeTick::set_time_unit_trigger_count(const String &unit_name, int trigger_
 		return;
 	}
 	
-	if (time_units.has(unit_name)) {
-		Dictionary time_unit = time_units[unit_name];
-		
-		// Check if this is a complex unit
-		if (time_unit.has("is_complex") && time_unit["is_complex"]) {
-			UtilityFunctions::push_error(vformat("TimeTick: Cannot set trigger_count for complex time unit '%s'. Use tracked_units dictionary instead.", unit_name));
-			return;
-		}
-		
-		time_unit["trigger_count"] = trigger_count;
-		time_units[unit_name] = time_unit;
-	} else {
+	if (!unit_manager.has_unit(unit_name)) {
 		UtilityFunctions::push_error(vformat("TimeTick: Time unit '%s' not found", unit_name));
+		return;
 	}
+	
+	if (unit_manager.is_complex(unit_name)) {
+		UtilityFunctions::push_error(vformat("TimeTick: Cannot set trigger_count for complex time unit '%s'. Use tracked_units dictionary instead.", unit_name));
+		return;
+	}
+	
+	unit_manager.set_trigger_count(unit_name, trigger_count);
 }
 
 int TimeTick::get_time_unit_trigger_count(const String &unit_name) const {
-	if (time_units.has(unit_name)) {
-		Dictionary time_unit = time_units[unit_name];
-		
-		// Check if this is a complex unit
-		if (time_unit.has("is_complex") && time_unit["is_complex"]) {
-			UtilityFunctions::push_warning(vformat("TimeTick: Complex time unit '%s' doesn't have a single trigger_count. Use get_time_unit_tracked_units() instead.", unit_name));
-			return -1;
-		}
-		
-		if (time_unit.has("trigger_count")) {
-			return time_unit["trigger_count"];
-		}
+	if (unit_manager.is_complex(unit_name)) {
+		UtilityFunctions::push_warning(vformat("TimeTick: Complex time unit '%s' doesn't have a single trigger_count. Use get_time_unit_tracked_units() instead.", unit_name));
+		return -1;
 	}
-	return 0;
+	return unit_manager.get_trigger_count(unit_name);
 }
 
 void TimeTick::set_time_unit_starting_value(const String &unit_name, int starting_value) {
-	if (time_units.has(unit_name)) {
-		Dictionary time_unit = time_units[unit_name];
-		time_unit["min_value"] = starting_value;
-		time_units[unit_name] = time_unit;
-	} else {
+	if (!unit_manager.has_unit(unit_name)) {
 		UtilityFunctions::push_error(vformat("TimeTick: Time unit '%s' not found", unit_name));
+		return;
 	}
+	unit_manager.set_min_value(unit_name, starting_value);
 }
 
 int TimeTick::get_time_unit_starting_value(const String &unit_name) const {
-	if (time_units.has(unit_name)) {
-		Dictionary time_unit = time_units[unit_name];
-		if (time_unit.has("min_value")) {
-			return time_unit["min_value"];
-		}
-	}
-	return 0;
+	return unit_manager.get_min_value(unit_name);
 }
 
 Dictionary TimeTick::get_time_unit_data(const String &unit_name) const {
-	if (time_units.has(unit_name)) {
-		return time_units[unit_name];
-	}
-	return Dictionary();
+	return unit_manager.get_unit(unit_name);
 }
 
 int TimeTick::get_time_unit(const String &unit_name) const {
-	if (time_units.has(unit_name)) {
-		Dictionary time_unit = time_units[unit_name];
-		return time_unit["current_value"];
-	}
-	return 0;
+	return unit_manager.get_value(unit_name);
 }
 
 void TimeTick::set_time_unit(const String &unit_name, int value) {
-	if (time_units.has(unit_name)) {
-		Dictionary time_unit = time_units[unit_name];
-		int old_value = time_unit["current_value"];
-		time_unit["current_value"] = value;
-		time_units[unit_name] = time_unit;
-		
-		// Reset this unit's counter to 0
-		// Time will progress naturally from the new value
-		unit_counters[unit_name] = 0;
-		
-		// Emit signal (only if value actually changed)
-		if (old_value != value) {
-			emit_signal("time_unit_changed", unit_name, value, old_value);
-		}
-	} else {
+	if (!unit_manager.has_unit(unit_name)) {
 		UtilityFunctions::push_error(vformat("TimeTick: Time unit '%s' not found", unit_name));
+		return;
+	}
+	
+	int old_value = unit_manager.get_value(unit_name);
+	unit_manager.set_value(unit_name, value);
+	unit_manager.set_counter(unit_name, 0);
+	
+	if (old_value != value) {
+		emit_signal("time_unit_changed", unit_name, value, old_value);
 	}
 }
 
@@ -229,40 +175,32 @@ void TimeTick::set_time_units(const Dictionary &values) {
 	for (int i = 0; i < keys.size(); i++) {
 		String unit_name = keys[i];
 		int value = values[unit_name];
-		if (time_units.has(unit_name)) {
-			Dictionary time_unit = time_units[unit_name];
-			time_unit["current_value"] = value;
-			time_units[unit_name] = time_unit;
+		if (unit_manager.has_unit(unit_name)) {
+			unit_manager.set_value(unit_name, value);
 		}
 	}
 	
 	// Then recalculate all counters based on what each unit tracks
-	Array all_keys = time_units.keys();
+	Array all_keys = unit_manager.get_all_unit_names();
 	for (int i = 0; i < all_keys.size(); i++) {
 		String unit_name = all_keys[i];
-		Dictionary time_unit = time_units[unit_name];
 		
 		// Only update counters for simple (non-complex) units
-		if (time_unit.has("tracked_unit") && !time_unit.has("is_complex")) {
-			String tracked = time_unit["tracked_unit"];
+		if (!unit_manager.is_complex(unit_name)) {
+			String tracked = unit_manager.get_tracked_unit(unit_name);
 			
 			// Set counter based on the tracked unit's current value
 			if (tracked == "tick") {
-				// Track the global tick counter
-				unit_counters[unit_name] = current_tick;
-			} else if (time_units.has(tracked)) {
-				Dictionary tracked_unit = time_units[tracked];
-				int tracked_value = tracked_unit["current_value"];
-				int tracked_step = tracked_unit["step_amount"];
-				// Counter = tracked_value * tracked_step
-				unit_counters[unit_name] = tracked_value * tracked_step;
+				unit_manager.set_counter(unit_name, current_tick);
+			} else if (unit_manager.has_unit(tracked)) {
+				int tracked_value = unit_manager.get_value(tracked);
+				int tracked_step = unit_manager.get_step(tracked);
+				unit_manager.set_counter(unit_name, tracked_value * tracked_step);
 			} else {
-				// Tracked unit doesn't exist, reset to 0
-				unit_counters[unit_name] = 0;
+				unit_manager.set_counter(unit_name, 0);
 			}
 		} else {
-			// Complex units or units without tracking, reset to 0
-			unit_counters[unit_name] = 0;
+			unit_manager.set_counter(unit_name, 0);
 		}
 	}
 	
@@ -275,23 +213,17 @@ void TimeTick::set_time_units(const Dictionary &values) {
 }
 
 TypedArray<String> TimeTick::get_time_unit_names() const {
-	TypedArray<String> names;
-	Array keys = time_units.keys();
-	for (int i = 0; i < keys.size(); i++) {
-		names.append(keys[i]);
-	}
-	return names;
+	return unit_manager.get_all_names();
 }
 
 String TimeTick::get_formatted_time(const String &format_string) const {
 	String result = format_string;
-	Array keys = time_units.keys();
+	Array keys = unit_manager.get_all_unit_names();
 	
 	for (int i = 0; i < keys.size(); i++) {
 		String unit_name = keys[i];
-		Dictionary time_unit = time_units[unit_name];
-		int value = time_unit["current_value"];
-		String placeholder = "{" + unit_name + "}";
+		int value = unit_manager.get_value(unit_name);
+		String placeholder = String("{") + unit_name + String("}");
 		result = result.replace(placeholder, String::num_int64(value));
 	}
 	
@@ -303,9 +235,8 @@ String TimeTick::get_formatted_time_padded(const TypedArray<String> &units, cons
 	
 	for (int i = 0; i < units.size(); i++) {
 		String unit_name = units[i];
-		if (time_units.has(unit_name)) {
-			Dictionary time_unit = time_units[unit_name];
-			int value = time_unit["current_value"];
+		if (unit_manager.has_unit(unit_name)) {
+			int value = unit_manager.get_value(unit_name);
 			parts.append(String::num_int64(value).pad_zeros(padding));
 		} else {
 			parts.append("00");
@@ -327,7 +258,7 @@ void TimeTick::shutdown() {
 	}
 	
 	initialized = false;
-	time_units.clear();
+	unit_manager.clear();
 }
 
 void TimeTick::pause() {
@@ -349,16 +280,7 @@ bool TimeTick::is_paused() const {
 void TimeTick::reset() {
 	current_tick = 0;
 	accumulated_time = 0.0;
-	unit_counters.clear();
-	
-	Array keys = time_units.keys();
-	for (int i = 0; i < keys.size(); i++) {
-		String unit_name = keys[i];
-		Dictionary time_unit = time_units[unit_name];
-		time_unit["current_value"] = 0;
-		time_units[unit_name] = time_unit;
-		unit_counters[unit_name] = 0;
-	}
+	unit_manager.reset_all_to_zero();
 }
 
 void TimeTick::set_time_scale(double scale) {
@@ -465,295 +387,22 @@ void TimeTick::_process_tick(double delta) {
 }
 
 void TimeTick::_increment_unit(const String &unit_name) {
-	// Find all units that track this unit
-	Array keys = time_units.keys();
-	
-	for (int i = 0; i < keys.size(); i++) {
-		String child_unit_name = keys[i];
-		Dictionary time_unit = time_units[child_unit_name];
-		
-		// Check if this is a complex unit
-		bool is_complex = time_unit.has("is_complex") && (bool)time_unit["is_complex"];
-		
-		if (is_complex) {
-			// Complex unit: check if ALL tracked units have reached or exceeded their trigger values
-			Dictionary tracked_units = time_unit["tracked_units"];
-			bool should_check = tracked_units.has(unit_name);  // Only check if this unit being incremented is tracked
-			
-			if (should_check) {
-				// Check if ALL tracked units are at or past their required values
-				bool all_conditions_met = true;
-				bool should_reset = false;  // Only reset when OVERALL time has wrapped
-				Array tracked_keys = tracked_units.keys();
-				
-				for (int j = 0; j < tracked_keys.size(); j++) {
-					String tracked_unit = tracked_keys[j];
-					int required_value = tracked_units[tracked_unit];
-					int current_value = 0;
-					
-					// Special handling for "tick" unit
-					if (tracked_unit == "tick") {
-						current_value = current_tick;
-					} else {
-						current_value = get_time_unit(tracked_unit);
-					}
-					
-					// Check if current value is less than required (hasn't reached it yet)
-					if (current_value < required_value) {
-						all_conditions_met = false;
-						// Only set should_reset if this is a "higher order" unit (not second/minute which wrap frequently)
-						// For example, if hour < required_hour, then we've truly wrapped around the day
-						if (tracked_unit == "hour" || tracked_unit == "day" || tracked_unit == "month" || tracked_unit == "year") {
-							should_reset = true;
-						}
-						break;
-					}
-				}
-				
-				// Get the triggered state
-				String state_key = child_unit_name + "_triggered";
-				bool was_triggered = false;
-				if (time_unit.has(state_key)) {
-					was_triggered = (bool)time_unit[state_key];
-				}
-				
-				// If all conditions are NOW met and we haven't triggered yet
-				if (all_conditions_met && !was_triggered) {
-					int old_value = time_unit["current_value"];
-					int step = time_unit["step_amount"];
-					int max_value = time_unit["max_value"];
-					int min_value = time_unit.has("min_value") ? (int)time_unit["min_value"] : 0;
-					int new_value = old_value + step;
-					
-					// Handle wrapping if max_value is set
-					if (max_value > 0) {
-						// Range represents the number of possible values [min_value, max_value)
-						// max_value is EXCLUSIVE - wraps when reaching max_value
-						int range = max_value - min_value;
-						while (new_value >= max_value) {
-							new_value -= range;
-						}
-						while (new_value < min_value) {
-							new_value += range;
-						}
-					}
-					
-					// Update the value and mark as triggered
-					time_unit["current_value"] = new_value;
-					time_unit[state_key] = true;
-					time_units[child_unit_name] = time_unit;
-					
-					// Emit change signal
-					if (old_value != new_value) {
-						emit_signal("time_unit_changed", child_unit_name, new_value, old_value);
-					}
-					
-					// Trigger this complex unit's children
-					_increment_unit(child_unit_name);
-				} else if (should_reset && was_triggered) {
-					// A high-order unit fell below threshold - reset the trigger
-					// This happens when time wraps (e.g., hour goes from 23 to 0)
-					time_unit[state_key] = false;
-					time_units[child_unit_name] = time_unit;
-				}
-			}
-		} else {
-			// Simple unit: original logic
-			String tracked = time_unit["tracked_unit"];
-			if (tracked == unit_name) {
-			// Get or initialize the counter for THIS CHILD UNIT
-			// Counter tracks how much the parent has accumulated (in parent's step units)
-			int counter = 0;
-			if (unit_counters.has(child_unit_name)) {
-				counter = unit_counters[child_unit_name];
-			}
-			
-			// Get the parent's step amount to know how much to add to counter
-			int parent_step = 1;
-			if (time_units.has(unit_name)) {
-				Dictionary parent_unit = time_units[unit_name];
-				parent_step = parent_unit["step_amount"];
-			}
-			
-			counter += parent_step;  // Add parent's step, not just 1!
-			
-			int trigger_count = time_unit["trigger_count"];
-			
-			// Check if we've accumulated enough to trigger
-			if (counter >= trigger_count) {
-				// Reset counter (or subtract trigger_count to handle overflow)
-				counter -= trigger_count;
-				unit_counters[child_unit_name] = counter;
-				
-				int old_value = time_unit["current_value"];
-				int step = time_unit["step_amount"];
-				int max_value = time_unit["max_value"];
-				int min_value = time_unit.has("min_value") ? (int)time_unit["min_value"] : 0;
-				int new_value = old_value + step;
-				
-				// Check for overflow before wrapping logic
-				if (step > 0 && old_value > INT_MAX - step) {
-					// Would overflow, reset to min_value
-					new_value = min_value;
-					UtilityFunctions::push_warning(vformat("TimeTick: Time unit '%s' would overflow, resetting to %d", child_unit_name, min_value));
-				} else if (step < 0 && old_value < INT_MIN - step) {
-					// Would underflow, reset to min_value
-					new_value = min_value;
-					UtilityFunctions::push_warning(vformat("TimeTick: Time unit '%s' would underflow, resetting to %d", child_unit_name, min_value));
-				}
-				
-				// Handle wrapping if max_value is set
-				if (max_value > 0) {
-					// Range represents the number of possible values [min_value, max_value)
-					// max_value is EXCLUSIVE - wraps when reaching max_value
-					int range = max_value - min_value;
-					bool did_wrap = false;
-					while (new_value >= max_value) {
-						new_value -= range;
-						did_wrap = true;
-					}
-					while (new_value < min_value) {
-						new_value += range;
-						did_wrap = true;
-					}
-					
-					// If wrapping occurred, trigger children FIRST before updating this unit
-					// This ensures that when this unit's signal emits, children have already updated
-					if (did_wrap) {
-						// Temporarily set the wrapped value so children can see it
-						int temp_old_value = time_unit["current_value"];
-						time_unit["current_value"] = new_value;
-						time_units[child_unit_name] = time_unit;
-						
-						// Trigger children - they'll increment based on seeing the wrap
-						_increment_unit(child_unit_name);
-						
-						// Now emit the signal for THIS unit's change
-						emit_signal("time_unit_changed", child_unit_name, new_value, old_value);
-						
-						// Skip the normal update below since we already did it
-						continue;
-					}
-				}
-				
-				// Update the value first
-				time_unit["current_value"] = new_value;
-				time_units[child_unit_name] = time_unit;
-				
-				// Emit change signal
-				if (old_value != new_value) {
-					emit_signal("time_unit_changed", child_unit_name, new_value, old_value);
-				}
-				
-				// Trigger children after value update
-				// This includes both wrapping units and event timers
-				_increment_unit(child_unit_name);
-				
-				// If we overflowed multiple times, trigger additional times
-				int overflow_count = 0;
-				if (max_value > 0) {
-					int test_value = old_value + step;
-					while (test_value >= max_value) {
-						test_value -= max_value;
-						overflow_count++;
-					}
-					
-					for (int j = 1; j < overflow_count; j++) {
-						_increment_unit(child_unit_name);
-					}
-				}
-			} else {
-				// Update the counter (not yet triggered)
-				unit_counters[child_unit_name] = counter;
-			}
-			}  // End if (tracked == unit_name)
-		}  // End else (simple unit)
-	}  // End for loop
+	if (processor) {
+		processor->set_current_tick(current_tick);
+		processor->increment_unit(unit_name);
+	}
 }
 
 void TimeTick::_decrement_unit(const String &unit_name) {
-	// Find all units that track this unit and decrement them
-	Array keys = time_units.keys();
-	
-	for (int i = 0; i < keys.size(); i++) {
-		String child_unit_name = keys[i];
-		Dictionary time_unit = time_units[child_unit_name];
-		
-		// Check if this is a complex unit
-		bool is_complex = time_unit.has("is_complex") && (bool)time_unit["is_complex"];
-		
-		if (is_complex) {
-			// Complex units don't work well with reverse time, skip for now
-			// TODO: Implement reverse logic for complex units if needed
-			continue;
-		} else {
-			// Simple unit: decrement logic
-			String tracked = time_unit["tracked_unit"];
-			if (tracked == unit_name) {
-				// Get or initialize the counter for THIS CHILD UNIT
-				int counter = 0;
-				if (unit_counters.has(child_unit_name)) {
-					counter = unit_counters[child_unit_name];
-				}
-				
-				// Get the parent's step amount to know how much to subtract from counter
-				int parent_step = 1;
-				if (time_units.has(unit_name)) {
-					Dictionary parent_unit = time_units[unit_name];
-					parent_step = parent_unit["step_amount"];
-				}
-				
-				counter -= parent_step;  // Subtract parent's step for reverse
-				
-				int trigger_count = time_unit["trigger_count"];
-				
-				// Check if we've decremented enough to trigger a reverse
-				if (counter < 0) {
-					// Wrap counter back
-					counter += trigger_count;
-					unit_counters[child_unit_name] = counter;
-					
-					int old_value = time_unit["current_value"];
-					int step = time_unit["step_amount"];
-					int max_value = time_unit["max_value"];
-					int min_value = time_unit.has("min_value") ? (int)time_unit["min_value"] : 0;
-					int new_value = old_value - step;  // Subtract instead of add
-					
-					// Handle wrapping if max_value is set (reverse direction)
-					if (max_value > 0) {
-						// max_value is EXCLUSIVE - wraps when reaching max_value
-						int range = max_value - min_value;
-						while (new_value < min_value) {
-							new_value += range;
-						}
-						while (new_value >= max_value) {
-							new_value -= range;
-						}
-					}
-					
-					// Prevent going below absolute minimum for non-wrapping units
-					if (max_value <= 0 && new_value < 0) {
-						new_value = 0;
-					}
-					
-					// Update the value first
-					time_unit["current_value"] = new_value;
-					time_units[child_unit_name] = time_unit;
-					
-					// Emit change signal
-					if (old_value != new_value) {
-						emit_signal("time_unit_changed", child_unit_name, new_value, old_value);
-					}
-					
-					// Trigger children after value update
-					_decrement_unit(child_unit_name);
-				} else {
-					// Update the counter (not yet triggered)
-					unit_counters[child_unit_name] = counter;
-				}
-			}  // End if (tracked == unit_name)
-		}  // End else (simple unit)
-	}  // End for loop
+	if (processor) {
+		processor->set_current_tick(current_tick);
+		processor->decrement_unit(unit_name);
+	}
+}
+
+// Signal emission helper (called by processor via callback)
+void TimeTick::_emit_unit_changed(const String &name, int new_val, int old_val) {
+	emit_signal("time_unit_changed", name, new_val, old_val);
 }
 
 // Bind methods

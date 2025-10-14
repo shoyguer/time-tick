@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="TimeTick" inherits="RefCounted" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A time tick system, with customizable time hierarchies.
+		A time tick system with customizable time hierarchies.
 	</brief_description>
 	<description>
 		Allows you to define custom time units with any names and relationships. Each unit tracks another unit and increments when that unit reaches a certain count. This enables complex scenarios like having both "month" and "year" track "day" with different trigger counts.
@@ -42,7 +42,9 @@
 		time_tick.set_time_unit_starting_value("hour", 14)
 		time_tick.set_time_unit_starting_value("minute", 30)
 		# Speed up or slow down time
-		time_tick.set_time_unit_step("minute", 5)  # Each tick adds 5 minutes
+
+		# Each tick adds 5 minutes
+		time_tick.set_time_unit_step("minute", 5)
 		time_tick.tick_updated.connect(_on_tick)
 		[/codeblock]
 	</description>
@@ -53,6 +55,11 @@
 			<return type="int" />
 			<description>
 				Returns the current tick count. The tick count increases by 1 each time a tick occurs (based on [code]tick_duration[/code] set in [method initialize]).
+				[codeblock]
+				# Output: 150 (after 150 ticks have passed)
+				var ticks = time_tick.get_current_tick()
+				print(ticks)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_formatted_time" qualifiers="const">
@@ -62,6 +69,11 @@
 				Returns a formatted time string using placeholders for time unit values.
 				Use [code]{unit_name}[/code] placeholders in the format string, which will be replaced with the current values of the corresponding time units.
 				Example: [code]get_formatted_time("Day {day}, {hour}:{minute}")[/code] might return "Day 5, 14:30".
+				[codeblock]
+				# Output: "Day 15, 14:30"
+				var time_str = time_tick.get_formatted_time("Day {day}, {hour}:{minute}")
+				print(time_str)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_formatted_time_padded" qualifiers="const">
@@ -75,6 +87,23 @@
 				[param separator] string is placed between each value (default is ":").
 				[param padding] specifies the minimum number of digits for each value (default is 2).
 				Example: [code]get_formatted_time_padded(["hour", "minute"], ":", 2)[/code] might return "05:03" for 5 hours and 3 minutes.
+				[codeblock]
+				var clock = time_tick.get_formatted_time_padded(["hour", "minute", "second"])
+				# Output: "05:03:07"
+				print(clock)
+				[/codeblock]
+			</description>
+		</method>
+		<method name="get_tick_duration" qualifiers="const">
+			<return type="float" />
+			<description>
+				Returns the tick duration in real-time seconds (the time between each tick).
+				This is the value set in [method initialize] or [method set_tick_duration].
+				[codeblock]
+				var duration = time_tick.get_tick_duration()
+				# Output: 1.0 (1 second per tick)
+				print(duration)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_tick_progress" qualifiers="const">
@@ -83,6 +112,11 @@
 				Returns the progress to the next tick as a value between 0.0 and 1.0.
 				This is useful for smooth animations or progress bars that show time progression between ticks.
 				Returns 0.0 if [code]tick_time[/code] is less than or equal to 0.0.
+				[codeblock]
+				var progress = time_tick.get_tick_progress()
+				# Smooth progress bar animation
+				$ProgressBar.value = progress * 100
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_time_scale" qualifiers="const">
@@ -90,13 +124,11 @@
 			<description>
 				Returns the current time scale multiplier.
 				[code]1.0[/code] is normal speed, [code]2.0[/code] is double speed, [code]0.5[/code] is half speed, etc.
-			</description>
-		</method>
-		<method name="get_tick_duration" qualifiers="const">
-			<return type="float" />
-			<description>
-				Returns the tick duration in real-time seconds (the time between each tick).
-				This is the value set in [method initialize] or [method set_tick_duration].
+				[codeblock]
+				var scale = time_tick.get_time_scale()
+				# Output: 1.0 (normal speed)
+				print(scale)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_time_unit" qualifiers="const">
@@ -105,6 +137,13 @@
 			<description>
 				Returns the current value of the specified time unit.
 				If the time unit does not exist, returns 0.
+				[codeblock]
+				time_tick.register_time_unit("hour", "tick", 3600, 24, 0)
+				time_tick.set_time_unit("hour", 14)
+				var current_hour = time_tick.get_time_unit("hour")
+				# Output: 14
+				print(current_hour)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_time_unit_data" qualifiers="const">
@@ -115,12 +154,25 @@
 				The dictionary includes keys like "name", "current_value", "tracked_unit", "trigger_count", "step_amount", "max_value", and "min_value".
 				If the time unit does not exist, returns an empty dictionary.
 				This is useful for inspecting or debugging time unit configurations.
+				[codeblock]
+				time_tick.register_time_unit("hour", "tick", 3600, 24, 0)
+				var data = time_tick.get_time_unit_data("hour")
+				# Output: 0
+				print(data["current_value"])
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_time_unit_names" qualifiers="const">
 			<return type="String[]" />
 			<description>
 				Returns an array containing the names of all registered time units.
+				[codeblock]
+				time_tick.register_time_unit("second", "tick", 1, 60, 0)
+				time_tick.register_time_unit("minute", "second", 60, 60, 0)
+				var units = time_tick.get_time_unit_names()
+				# Output: ["second", "minute"]
+				print(units)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_time_unit_starting_value" qualifiers="const">
@@ -130,6 +182,12 @@
 				Returns the starting value (minimum value for wrapping) of the specified time unit.
 				This is the value the unit will wrap back to when it exceeds [code]max_value[/code].
 				If the time unit does not exist or doesn't have a min_value set, returns 0.
+				[codeblock]
+				time_tick.register_time_unit("day", "hour", 24, 32, 1)
+				var start = time_tick.get_time_unit_starting_value("day")
+				# Output: 1 (days start at 1, not 0)
+				print(start)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_time_unit_step" qualifiers="const">
@@ -138,6 +196,12 @@
 			<description>
 				Returns the step amount of the specified time unit (how much it increases per parent tick).
 				If the time unit does not exist, returns 0.
+				[codeblock]
+				time_tick.register_time_unit("minute", "tick", 60, 60, 0)
+				var step = time_tick.get_time_unit_step("minute")
+				# Output: 1 (default step amount)
+				print(step)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="get_time_unit_trigger_count" qualifiers="const">
@@ -147,6 +211,12 @@
 				Returns the trigger count of the specified time unit (how many of the tracked unit are needed to trigger an increment).
 				Returns -1 for complex time units (those registered with [method register_complex_time_unit]).
 				If the time unit does not exist, returns 0.
+				[codeblock]
+				time_tick.register_time_unit("minute", "tick", 60, 60, 0)
+				var count = time_tick.get_time_unit_trigger_count("minute")
+				# Output: 60 (60 ticks = 1 minute)
+				print(count)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="initialize">
@@ -157,18 +227,33 @@
 				This must be called before using the time system. Resets all time units and tick count to zero.
 				[param tick_duration] is the time in seconds for each tick to update (default is 1.0 second per tick).
 				Valid range: 0.001 to 600.0 seconds. Values outside this range will be clamped.
+				[codeblock]
+				# 1 tick per second
+				time_tick.initialize(1.0)
+				# 2 ticks per second
+				time_tick.initialize(0.5)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="is_initialized" qualifiers="const">
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] if the system has been initialized with [method initialize], [code]false[/code] otherwise.
+				[codeblock]
+				# Only runs if initialized
+				if time_tick.is_initialized():
+					print("Ready!")
+				[/codeblock]
 			</description>
 		</method>
 		<method name="is_paused" qualifiers="const">
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] if the tick system is currently paused, [code]false[/code] otherwise.
+				[codeblock]
+				# Show pause UI
+				$PauseLabel.visible = time_tick.is_paused()
+				[/codeblock]
 			</description>
 		</method>
 		<method name="pause">
@@ -176,6 +261,10 @@
 			<description>
 				Pauses the tick system. Time will stop progressing until [method resume] is called.
 				Useful for pause menus or freezing time during cutscenes.
+				[codeblock]
+				# Time stops progressing
+				time_tick.pause()
+				[/codeblock]
 			</description>
 		</method>
 		<method name="register_complex_time_unit">
@@ -198,6 +287,10 @@
 				- Sidereal day: triggers at exactly 23 hours, 56 minutes, 4 seconds
 				- Lunar month: triggers at 29 days, 12 hours, 44 minutes, 3 seconds
 				- Game events: trigger at specific times like dawn (6:30:20) or dusk (18:15:30)
+				[codeblock]
+				# Triggers at 23h:56m:4s (sidereal day)
+				time_tick.register_complex_time_unit("sidereal", {"hour": 23, "minute": 56, "second": 4})
+				[/codeblock]
 			</description>
 		</method>
 		<method name="register_time_unit">
@@ -216,20 +309,48 @@
 				[param min_value] is the minimum value to wrap to when reaching [param max_value]. Use 0 for units like seconds/minutes/hours, use 1 for units like days/months that should wrap to 1 instead of 0. Default is 0. Also serves as the starting value.
 				[b]Note:[/b] [code]step_amount[/code] defaults to 1 and [code]starting_value[/code] defaults to [param min_value]. Use [method set_time_unit_step] and [method set_time_unit_starting_value] to change these after registration if needed.
 				Multiple units can track the same unit with different trigger counts, enabling complex scenarios like having both "month" (tracks every 30 days) and "year" (tracks every 365 days) monitor "day" independently.
+				[codeblock]
+				# 60 seconds = 1 minute, wraps 0-59
+				time_tick.register_time_unit("minute", "second", 60, 60, 0)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="reset">
 			<return type="void" />
 			<description>
-				Resets the tick system and all time units to zero.
-				The current tick count and all registered time unit values are set back to 0.
+				Resets the tick system and all time units to their starting values.
+				The current tick count is set to 0, and all registered time unit values are reset to their minimum values (min_value).
 				Accumulated time is also cleared.
+				[codeblock]
+				time_tick.set_time_unit("hour", 14)
+				time_tick.set_time_unit("minute", 30)
+				# All units reset to their min_value
+				time_tick.reset()
+				[/codeblock]
 			</description>
 		</method>
 		<method name="resume">
 			<return type="void" />
 			<description>
 				Resumes the tick system after being paused. Time will continue progressing normally.
+				[codeblock]
+				time_tick.pause()
+				# Time continues progressing
+				time_tick.resume()
+				[/codeblock]
+			</description>
+		</method>
+		<method name="set_tick_duration">
+			<return type="void" />
+			<param index="0" name="duration" type="float" />
+			<description>
+				Sets the tick duration in real-time seconds (the time between each tick).
+				[param duration] is clamped to the range 0.001 to 600.0 seconds.
+				This allows you to dynamically change the tick rate without reinitializing the system.
+				[codeblock]
+				# Now 1 tick every 2 seconds
+				time_tick.set_tick_duration(2.0)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="set_time_scale">
@@ -246,15 +367,12 @@
 				- -1.0 = normal speed (backward)
 				- -2.0 = double speed (backward)
 				[b]Note:[/b] Negative values reverse time. The tick count will decrement instead of increment, and time units will count backward.
-			</description>
-		</method>
-		<method name="set_tick_duration">
-			<return type="void" />
-			<param index="0" name="duration" type="float" />
-			<description>
-				Sets the tick duration in real-time seconds (the time between each tick).
-				[param duration] is clamped to the range 0.001 to 600.0 seconds.
-				This allows you to dynamically change the tick rate without reinitializing the system.
+				[codeblock]
+				# Double speed
+				time_tick.set_time_scale(2.0)
+				# Reverse time
+				time_tick.set_time_scale(-1.0)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="set_time_unit">
@@ -266,6 +384,11 @@
 				Emits the [signal time_unit_changed] signal if the value changes.
 				Prints an error if the time unit does not exist.
 				This is useful for loading saved game time or jumping to a specific time.
+				[codeblock]
+				time_tick.register_time_unit("hour", "tick", 3600, 24, 0)
+				# Set hour to 14
+				time_tick.set_time_unit("hour", 14)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="set_time_unit_starting_value">
@@ -277,6 +400,11 @@
 				This value determines where the unit wraps back to when it exceeds [code]max_value[/code].
 				For example, if hours have a starting_value of 1 and max_value of 24, they will wrap from 24 back to 1 instead of 0.
 				Prints an error if the time unit does not exist.
+				[codeblock]
+				time_tick.register_time_unit("day", "tick", 24, 32)
+				# Days wrap to 1 instead of 0
+				time_tick.set_time_unit_starting_value("day", 1)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="set_time_unit_step">
@@ -287,6 +415,11 @@
 				Sets the step amount for a time unit (how much it increases per parent tick).
 				[param step_amount] can be negative to create countdown behavior.
 				Prints an error if the time unit does not exist.
+				[codeblock]
+				time_tick.register_time_unit("minute", "tick", 1, 60, 0)
+				# Each tick adds 5 minutes instead of 1 minute
+				time_tick.set_time_unit_step("minute", 5)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="set_time_unit_trigger_count">
@@ -299,6 +432,11 @@
 				Cannot be used on complex time units (those registered with [method register_complex_time_unit]).
 				Prints an error if the time unit does not exist or if trigger_count is not positive.
 				This is useful for dynamically changing time progression, such as speeding up or slowing down specific units.
+				[codeblock]
+				time_tick.register_time_unit("minute", "tick", 60, 60, 0)
+				# Now 30 ticks = 1 minute (instead of 60)
+				time_tick.set_time_unit_trigger_count("minute", 30)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="set_time_units">
@@ -309,6 +447,12 @@
 				The dictionary should map unit names to their starting values (e.g., {"day": 5, "hour": 14, "minute": 30}).
 				This is more efficient than calling [method set_time_unit] multiple times.
 				Emits [signal time_unit_changed] for each unit that changes.
+				[codeblock]
+				time_tick.register_time_unit("hour", "tick", 3600, 24, 0)
+				time_tick.register_time_unit("day", "hour", 24, 32, 1)
+				# Set multiple units at once
+				time_tick.set_time_units({"day": 5, "hour": 14})
+				[/codeblock]
 			</description>
 		</method>
 		<method name="shutdown">
@@ -316,12 +460,20 @@
 			<description>
 				Cleans up the object by clearing all time units and marks the system as uninitialized.
 				Should be called when the TimeTick instance is no longer needed.
+				[codeblock]
+				# Cleanup when done
+				time_tick.shutdown()
+				[/codeblock]
 			</description>
 		</method>
 		<method name="toggle_pause">
 			<return type="void" />
 			<description>
 				Toggles the pause state of the tick system. If currently paused, it will resume. If currently running, it will pause.
+				[codeblock]
+				# Toggle pause on/off
+				time_tick.toggle_pause()
+				[/codeblock]
 			</description>
 		</method>
 		<method name="unregister_time_unit">
@@ -329,6 +481,11 @@
 			<param index="0" name="unit_name" type="String" />
 			<description>
 				Unregisters and removes a time unit from the system. The time unit will no longer be tracked or updated.
+				[codeblock]
+				time_tick.register_time_unit("minute", "tick", 1, 60, 0)
+				# Remove a time unit
+				time_tick.unregister_time_unit("minute")
+				[/codeblock]
 			</description>
 		</method>
 	</methods>
@@ -338,6 +495,15 @@
 			<description>
 				Emitted whenever a tick passes (based on the tick duration set in [method initialize]).
 				[param current_tick] is the current tick count after the update.
+				[codeblock]
+				func _ready() -> void:
+					var time_tick := TimeTick.new()
+					time_tick.initialize(1.0)
+					time_tick.tick_updated.connect(_on_tick_updated)
+				
+				func _on_tick_updated(current_tick: int) -> void:
+					print("Tick: ", current_tick)
+				[/codeblock]
 			</description>
 		</signal>
 		<signal name="time_unit_changed">
@@ -350,6 +516,18 @@
 				[param new_value] is the new value of the time unit.
 				[param old_value] is the previous value of the time unit.
 				This signal is useful for triggering events on specific time changes, such as when a new day begins or an hour passes.
+				[codeblock]
+				func _ready() -> void:
+					var time_tick := TimeTick.new()
+					time_tick.initialize(1.0)
+					time_tick.register_time_unit("hour", "tick", 60, 24, 0)
+					time_tick.time_unit_changed.connect(_on_time_unit_changed)
+				
+				func _on_time_unit_changed(unit_name: String, new_value: int, old_value: int) -> void:
+					print(unit_name, ": ", old_value, " -> ", new_value)
+					if unit_name == "hour" and new_value == 0:
+						print("New day started!")
+				[/codeblock]
 			</description>
 		</signal>
 	</signals>
