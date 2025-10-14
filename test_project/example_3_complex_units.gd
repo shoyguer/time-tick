@@ -8,26 +8,29 @@ extends Node
 ## - Lunar cycle tracking
 ## - Working with >= triggers (not exact matches)
 
+
 var time_tick: TimeTick
 
 
 func _ready() -> void:
-	print("\n=== EXAMPLE 3: Complex Time Units ===\n")
+	print("\nEXAMPLE 3: Complex Time Units\n")
 	
 	# Create and initialize TimeTick
 	time_tick = TimeTick.new()
 	time_tick.initialize(0.05)
 	
-	# Build time hierarchy with fast progression for demo
-	time_tick.register_time_unit("second", "tick", 1, 60, 0)     # Wraps 0-59
-	time_tick.register_time_unit("minute", "second", 60, 60, 0)  # 60 seconds = 1 minute, wraps 0-59
-	time_tick.register_time_unit("hour", "minute", 60, 24, 0)    # 60 minutes = 1 hour, wraps 0-23
+	# Wraps 0-59
+	time_tick.register_time_unit("second", "tick", 1, 60, 0)
+	# 60 seconds = 1 minute, wraps 0-59
+	time_tick.register_time_unit("minute", "second", 60, 60, 0)
+	# 60 minutes = 1 hour, wraps 0-23
+	time_tick.register_time_unit("hour", "minute", 60, 24, 0)
 	
-	# Set fast seconds using step amount
-	time_tick.set_time_unit_step("second", 10)  # Fast seconds for demo
+	# Fast seconds for demo
+	time_tick.set_time_unit_step("second", 10)
 	
-	# Regular solar day (24 hours)
-	time_tick.register_time_unit("solar_day", "hour", 24)  # No wrap
+	# No wrap
+	time_tick.register_time_unit("solar_day", "hour", 24)
 	
 	# COMPLEX UNIT: Sidereal day (23h 56m 4s)
 	# Triggers when hour >= 23 AND minute >= 56 AND second >= 4
@@ -36,6 +39,7 @@ func _ready() -> void:
 		"minute": 56,
 		"second": 4
 	}
+    # Search for sidereal day to understand what it is.
 	time_tick.register_complex_time_unit("sidereal_day", sidereal_conditions)
 	
 	# COMPLEX UNITS: Time-of-day events
@@ -51,7 +55,8 @@ func _ready() -> void:
 	
 	# COMPLEX UNIT: Lunar synodic month (29d 12h 44m 3s)
 	# Note: This would require a 'day' unit to work properly
-	time_tick.register_time_unit("day", "hour", 24, 30, 0)  # Wrap 0-29 for demo
+	# Wrap 0-29 for demo
+	time_tick.register_time_unit("day", "hour", 24, 30, 0)
 	var lunar_month_conditions = {
 		"day": 29,
 		"hour": 12,
@@ -80,7 +85,7 @@ func _ready() -> void:
 	
 	# Start near a trigger point to demonstrate
 	await get_tree().create_timer(1.0).timeout
-	print("--- Jumping to 23:55:00 to watch sidereal day trigger ---\n")
+	print("--- Jumping to 23:55:00 to watch sidereal day trigger\n")
 	time_tick.set_time_units({
 		"hour": 23,
 		"minute": 55,

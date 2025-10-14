@@ -8,21 +8,27 @@ extends Node
 ## - Time scale manipulation
 ## - Setting specific time values
 
+
 var time_tick: TimeTick
 
 
 func _ready() -> void:
-	print("\n=== EXAMPLE 1: Basic Time System ===\n")
+	print("\nEXAMPLE 1: Basic Time System\n")
 	
 	# Create and initialize TimeTick
 	time_tick = TimeTick.new()
 	time_tick.initialize(0.1)  # Every 0.1 second, a new tick will be triggered.
 	
 	# Build standard time hierarchy
-	time_tick.register_time_unit("second", "tick", 1, 60, 0)     # 1 tick = 1 second (virtual second, not real), wraps 0-59
-	time_tick.register_time_unit("minute", "second", 60, 60, 0)  # 60 seconds = 1 minute, wraps 0-59
-	time_tick.register_time_unit("hour", "minute", 60, 24, 0)    # 60 minutes = 1 hour, wraps 0-23
-	time_tick.register_time_unit("day", "hour", 24, -1, 1)       # 24 hours = 1 day, starts at day 1, no wrap
+
+	# 1 tick = 1 second (virtual second, not real), wraps 0-59
+	time_tick.register_time_unit("second", "tick", 1, 60, 0)
+	# 60 seconds = 1 minute, wraps 0-59
+	time_tick.register_time_unit("minute", "second", 60, 60, 0)
+	# 60 minutes = 1 hour, wraps 0-23
+	time_tick.register_time_unit("hour", "minute", 60, 24, 0)
+	# 24 hours = 1 day, starts at day 1, no wrap
+	time_tick.register_time_unit("day", "hour", 24, -1, 1)
 	
 	# Connect to signals
 	time_tick.time_unit_changed.connect(_on_time_unit_changed)
@@ -44,16 +50,16 @@ func _ready() -> void:
 	
 	# Demonstrate pause/resume
 	await get_tree().create_timer(4.0).timeout
-	print("\n--- Pausing time ---")
+	print("\n--- Pausing time")
 	time_tick.pause()
 	
 	await get_tree().create_timer(2.0).timeout
-	print("--- Resuming time ---")
+	print("--- Resuming time")
 	time_tick.resume()
 	
 	# Demonstrate time scale changes
 	await get_tree().create_timer(3.0).timeout
-	print("\n--- Increasing time scale to 200x ---")
+	print("\n--- Increasing time scale to 200x")
 	time_tick.set_time_scale(200.0)
 
 

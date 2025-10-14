@@ -46,12 +46,9 @@ Check the [Wiki](https://github.com/shoyguer/time-tick/wiki) for information on 
 
 Or jump to whatever you need:
 
-#### Class reference
+#### Wiki
 - [Class Reference](https://github.com/shoyguer/time-tick/wiki/1.-Class-Reference)
-
-#### Usage Examples
-- [GDScript](https://github.com/shoyguer/time-tick/wiki/2.1.-GDScript-Code-Example)
-- [C#](https://github.com/shoyguer/time-tick/wiki/2.2.-C%23-code-example)
+- [Code Examples](https://github.com/shoyguer/time-tick/wiki/2.1.-GDScript-Code-Example)
 
 ## Other Plugins
 Check out my other Godot plugins:
