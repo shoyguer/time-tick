@@ -6,6 +6,8 @@
 
 using namespace godot;
 
+
+// Increments a unit and cascades to all dependent child units
 void TimeUnitProcessor::increment_unit(const String &unit_name) {
 	Array all_units = unit_manager->get_all_unit_names();
 	
@@ -23,6 +25,7 @@ void TimeUnitProcessor::increment_unit(const String &unit_name) {
 	}
 }
 
+// Decrements a unit and cascades to all dependent child units (reverse time)
 void TimeUnitProcessor::decrement_unit(const String &unit_name) {
 	Array all_units = unit_manager->get_all_unit_names();
 	
@@ -41,6 +44,7 @@ void TimeUnitProcessor::decrement_unit(const String &unit_name) {
 	}
 }
 
+// Processes increment for a simple unit, handling counters, overflow, and wrapping
 void TimeUnitProcessor::process_simple_unit_increment(const String &child_name, const String &parent_name) {
 	int counter = unit_manager->get_counter(child_name);
 	int parent_step = unit_manager->get_step(parent_name);
@@ -96,6 +100,7 @@ void TimeUnitProcessor::process_simple_unit_increment(const String &child_name, 
 	}
 }
 
+// Processes decrement for a simple unit (reverse time support)
 void TimeUnitProcessor::process_simple_unit_decrement(const String &child_name, const String &parent_name) {
 	int counter = unit_manager->get_counter(child_name);
 	int parent_step = unit_manager->get_step(parent_name);
@@ -132,6 +137,7 @@ void TimeUnitProcessor::process_simple_unit_decrement(const String &child_name, 
 	}
 }
 
+// Processes complex units that depend on multiple tracked unit values
 void TimeUnitProcessor::process_complex_unit(const String &child_name, const String &parent_name) {
 	Dictionary tracked_units = unit_manager->get_tracked_units(child_name);
 	
@@ -172,6 +178,7 @@ void TimeUnitProcessor::process_complex_unit(const String &child_name, const Str
 	}
 }
 
+// Checks if all conditions for a complex unit are met
 bool TimeUnitProcessor::check_complex_conditions(const String &unit_name) {
 	Dictionary tracked_units = unit_manager->get_tracked_units(unit_name);
 	Array keys = tracked_units.keys();
@@ -195,6 +202,7 @@ bool TimeUnitProcessor::check_complex_conditions(const String &unit_name) {
 	return true;
 }
 
+// Applies min/max wrapping to a value (e.g., 60 seconds wraps to 0)
 int TimeUnitProcessor::apply_wrapping(int value, int min_val, int max_val) {
 	if (max_val <= 0) {
 		return value;
@@ -211,6 +219,7 @@ int TimeUnitProcessor::apply_wrapping(int value, int min_val, int max_val) {
 	return value;
 }
 
+// Emits the time_unit_changed signal through the callback
 void TimeUnitProcessor::emit_change_signal(const String &name, int new_val, int old_val) {
 	if (signal_callback.is_valid()) {
 		Array args;

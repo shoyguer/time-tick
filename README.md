@@ -1,10 +1,12 @@
 # TimeTick
-A flexible time management system for Godot games. Perfect for creating day/night cycles, custom calendars, countdown timers, or any time-based game mechanics with customizable time hierarchies.
+A flexible time management system for Godot games. Perfect for creating day/night cycles, custom calendars, or any time-based game mechanics with customizable time hierarchies.
+With the tick system you can easily have AI that only process when a tick happens, or mechanics that only happens every 'x' amount of ticks.
 
 ![Header Image](https://raw.githubusercontent.com/shoyguer/time-tick/refs/heads/main/brand/header_image.png)
 
 ## Why Use TimeTick?
-Managing time systems in games can be complex. And this plugin will provide you with:
+Managing tick & time systems in games can be complex. And this plugin will provide you with:
+- Out of the box tick system you can use with signal connection
 - Customizable time units with any names and relationships
 - Multiple time units tracking the same parent unit independently
 - Complex timing events based on multiple conditions

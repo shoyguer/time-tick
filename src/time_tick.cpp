@@ -9,6 +9,7 @@
 
 using namespace godot;
 
+
 TimeTick::TimeTick() {
 	// Constructor
 }
@@ -21,6 +22,7 @@ TimeTick::~TimeTick() {
 	}
 }
 
+// Initializes the time system with specified tick duration and connects to physics frame
 void TimeTick::initialize(double tick_duration) {
 	if (tick_duration <= 0.0) {
 		UtilityFunctions::push_warning("TimeTick: Tick duration must be greater than 0.0, clamping to 0.001");
@@ -55,6 +57,7 @@ void TimeTick::initialize(double tick_duration) {
 	}
 }
 
+// Registers a simple time unit that increments when a tracked unit reaches trigger count
 void TimeTick::register_time_unit(const String &unit_name, const String &tracked_unit, int trigger_count, int max_value, int min_value) {
 	if (unit_name.is_empty()) {
 		UtilityFunctions::push_error("TimeTick: Unit name cannot be empty");
@@ -70,6 +73,7 @@ void TimeTick::register_time_unit(const String &unit_name, const String &tracked
 	unit_manager.register_simple_unit(unit_name, tracked_unit, trigger_count, max_value, min_value);
 }
 
+// Registers a complex time unit that increments when all tracked units meet specific conditions
 void TimeTick::register_complex_time_unit(const String &unit_name, const Dictionary &tracked_units, int max_value, int min_value) {
 	if (unit_name.is_empty()) {
 		UtilityFunctions::push_error("TimeTick: Unit name cannot be empty");
@@ -94,10 +98,12 @@ void TimeTick::register_complex_time_unit(const String &unit_name, const Diction
 	unit_manager.register_complex_unit(unit_name, tracked_units, max_value, min_value);
 }
 
+// Removes a time unit from the system
 void TimeTick::unregister_time_unit(const String &unit_name) {
 	unit_manager.unregister_unit(unit_name);
 }
 
+// Sets how much a time unit increments per parent unit tick
 void TimeTick::set_time_unit_step(const String &unit_name, int step_amount) {
 	if (!unit_manager.has_unit(unit_name)) {
 		UtilityFunctions::push_error(vformat("TimeTick: Time unit '%s' not found", unit_name));
@@ -106,10 +112,12 @@ void TimeTick::set_time_unit_step(const String &unit_name, int step_amount) {
 	unit_manager.set_step(unit_name, step_amount);
 }
 
+// Returns the step amount for a time unit
 int TimeTick::get_time_unit_step(const String &unit_name) const {
 	return unit_manager.get_step(unit_name);
 }
 
+// Sets how many tracked units are needed before this unit increments
 void TimeTick::set_time_unit_trigger_count(const String &unit_name, int trigger_count) {
 	if (trigger_count <= 0) {
 		UtilityFunctions::push_error("TimeTick: Trigger count must be positive");
@@ -129,6 +137,7 @@ void TimeTick::set_time_unit_trigger_count(const String &unit_name, int trigger_
 	unit_manager.set_trigger_count(unit_name, trigger_count);
 }
 
+// Returns the trigger count for a time unit (returns -1 for complex units)
 int TimeTick::get_time_unit_trigger_count(const String &unit_name) const {
 	if (unit_manager.is_complex(unit_name)) {
 		UtilityFunctions::push_warning(vformat("TimeTick: Complex time unit '%s' doesn't have a single trigger_count. Use get_time_unit_tracked_units() instead.", unit_name));
@@ -137,6 +146,7 @@ int TimeTick::get_time_unit_trigger_count(const String &unit_name) const {
 	return unit_manager.get_trigger_count(unit_name);
 }
 
+// Sets the minimum value a time unit wraps back to when exceeding max
 void TimeTick::set_time_unit_starting_value(const String &unit_name, int starting_value) {
 	if (!unit_manager.has_unit(unit_name)) {
 		UtilityFunctions::push_error(vformat("TimeTick: Time unit '%s' not found", unit_name));
@@ -145,18 +155,22 @@ void TimeTick::set_time_unit_starting_value(const String &unit_name, int startin
 	unit_manager.set_min_value(unit_name, starting_value);
 }
 
+// Returns the starting value (minimum) for a time unit
 int TimeTick::get_time_unit_starting_value(const String &unit_name) const {
 	return unit_manager.get_min_value(unit_name);
 }
 
+// Returns a dictionary containing all data for a time unit
 Dictionary TimeTick::get_time_unit_data(const String &unit_name) const {
 	return unit_manager.get_unit(unit_name);
 }
 
+// Returns the current value of a time unit
 int TimeTick::get_time_unit(const String &unit_name) const {
 	return unit_manager.get_value(unit_name);
 }
 
+// Sets the current value of a time unit directly and emits signal if changed
 void TimeTick::set_time_unit(const String &unit_name, int value) {
 	if (!unit_manager.has_unit(unit_name)) {
 		UtilityFunctions::push_error(vformat("TimeTick: Time unit '%s' not found", unit_name));
@@ -172,6 +186,7 @@ void TimeTick::set_time_unit(const String &unit_name, int value) {
 	}
 }
 
+// Sets multiple time unit values at once from a dictionary and recalculates counters
 void TimeTick::set_time_units(const Dictionary &values) {
 	// First, set all the values
 	Array keys = values.keys();
@@ -215,10 +230,12 @@ void TimeTick::set_time_units(const Dictionary &values) {
 	}
 }
 
+// Returns an array of all registered time unit names
 TypedArray<String> TimeTick::get_time_unit_names() const {
 	return unit_manager.get_all_names();
 }
 
+// Returns a formatted string with time unit values replacing {unit_name} placeholders
 String TimeTick::get_formatted_time(const String &format_string) const {
 	String result = format_string;
 	Array keys = unit_manager.get_all_unit_names();
@@ -233,6 +250,7 @@ String TimeTick::get_formatted_time(const String &format_string) const {
 	return result;
 }
 
+// Returns a formatted string with zero-padded time unit values separated by a delimiter
 String TimeTick::get_formatted_time_padded(const TypedArray<String> &units, const String &separator, int padding) const {
 	PackedStringArray parts;
 	
@@ -249,6 +267,7 @@ String TimeTick::get_formatted_time_padded(const TypedArray<String> &units, cons
 	return separator.join(parts);
 }
 
+// Cleans up the time system and disconnects from physics frame
 void TimeTick::shutdown() {
 	// Disconnect from SceneTree's physics_frame signal
 	SceneTree *tree = Object::cast_to<SceneTree>(Engine::get_singleton()->get_main_loop());
@@ -264,36 +283,44 @@ void TimeTick::shutdown() {
 	unit_manager.clear();
 }
 
+// Pauses time progression
 void TimeTick::pause() {
 	paused = true;
 }
 
+// Resumes time progression after being paused
 void TimeTick::resume() {
 	paused = false;
 }
 
+// Toggles between paused and unpaused states
 void TimeTick::toggle_pause() {
 	paused = !paused;
 }
 
+// Returns true if time is currently paused
 bool TimeTick::is_paused() const {
 	return paused;
 }
 
+// Resets tick count and all time units to their starting values
 void TimeTick::reset() {
 	current_tick = 0;
 	accumulated_time = 0.0;
-	unit_manager.reset_all_to_zero();
+	unit_manager.reset_all_to_min();
 }
 
+// Sets the time scale multiplier (negative values reverse time)
 void TimeTick::set_time_scale(double scale) {
 	time_scale = CLAMP(scale, -1000.0, 1000.0);
 }
 
+// Returns the current time scale multiplier
 double TimeTick::get_time_scale() const {
 	return time_scale;
 }
 
+// Sets the tick duration in real-time seconds
 void TimeTick::set_tick_duration(double duration) {
 	if (duration <= 0.0) {
 		UtilityFunctions::push_warning("TimeTick: Tick duration must be greater than 0.0, clamping to 0.001");
@@ -302,14 +329,17 @@ void TimeTick::set_tick_duration(double duration) {
 	tick_time = CLAMP(duration, 0.001, 600.0);
 }
 
+// Returns the tick duration in real-time seconds
 double TimeTick::get_tick_duration() const {
 	return tick_time;
 }
 
+// Returns the current tick count
 int TimeTick::get_current_tick() const {
 	return current_tick;
 }
 
+// Returns progress to next tick as a value between 0.0 and 1.0
 double TimeTick::get_tick_progress() const {
 	if (tick_time <= 0.0) {
 		return 0.0;
@@ -317,12 +347,14 @@ double TimeTick::get_tick_progress() const {
 	return CLAMP(accumulated_time / tick_time, 0.0, 1.0);
 }
 
+// Returns true if the system has been initialized
 bool TimeTick::is_initialized() const {
 	return initialized;
 }
 
-// Private methods
 
+// Private methods
+// Called every physics frame to process time progression
 void TimeTick::_on_physics_frame() {
 	if (!initialized) {
 		return;
@@ -334,6 +366,7 @@ void TimeTick::_on_physics_frame() {
 	_process_tick(delta);
 }
 
+// Processes time accumulation and triggers ticks (supports forward and backward time)
 void TimeTick::_process_tick(double delta) {
 	if (paused) {
 		return;
@@ -389,6 +422,7 @@ void TimeTick::_process_tick(double delta) {
 	}
 }
 
+// Increments a time unit and processes cascading effects
 void TimeTick::_increment_unit(const String &unit_name) {
 	if (processor) {
 		processor->set_current_tick(current_tick);
@@ -396,6 +430,7 @@ void TimeTick::_increment_unit(const String &unit_name) {
 	}
 }
 
+// Decrements a time unit and processes cascading effects
 void TimeTick::_decrement_unit(const String &unit_name) {
 	if (processor) {
 		processor->set_current_tick(current_tick);
@@ -403,13 +438,14 @@ void TimeTick::_decrement_unit(const String &unit_name) {
 	}
 }
 
+// Emits the time_unit_changed signal when a unit value changes
 // Signal emission helper (called by processor via callback)
 void TimeTick::_emit_unit_changed(const String &name, int new_val, int old_val) {
 	emit_signal("time_unit_changed", name, new_val, old_val);
 }
 
+// Registers all methods, properties, and signals with Godot's ClassDB
 // Bind methods
-
 void TimeTick::_bind_methods() {
 	// Signals
 	ADD_SIGNAL(MethodInfo("tick_updated", PropertyInfo(Variant::INT, "current_tick")));

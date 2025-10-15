@@ -9,6 +9,7 @@
 
 using namespace godot;
 
+
 // Internal helper class to manage time unit storage and operations
 // This is NOT exposed to Godot. This is just for internal organization.
 class TimeUnitManager {
@@ -43,7 +44,6 @@ public:
 	Dictionary get_tracked_units(const String &name) const;
 	
 	// Bulk operations
-	void reset_all_to_zero();
 	void reset_all_to_min();
 	void clear();
 	
@@ -58,6 +58,8 @@ public:
 	Array get_all_unit_names() const { return units.keys(); }
 	
 private:
-	Dictionary units;      // Stores time unit data
-	Dictionary counters;   // Stores accumulation counters
+	// Stores time unit data
+	Dictionary units;
+	// Stores accumulation counters for
+	Dictionary counters;
 };
