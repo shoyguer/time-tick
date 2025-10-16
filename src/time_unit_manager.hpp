@@ -54,7 +54,6 @@ public:
 	void increment_counter(const String &name, int amount);
 	void decrement_counter(const String &name, int amount);
 	
-	// Iteration
 	Array get_all_unit_names() const { return units.keys(); }
 	
 private:
