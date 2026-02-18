@@ -1,6 +1,6 @@
 [configuration]
 entry_symbol = "time_tick_init"
-compatibility_minimum = "4.4"
+compatibility_minimum = "4.6"
 
 [icons]
 TimeTick = "./time_tick.svg"

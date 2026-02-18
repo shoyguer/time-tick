@@ -1,3 +1,4 @@
 time_tick
-GODOT_VERSION_GOES_HERE
+4.6
+Time Tick
 D:\Software\Godot 4.5\Godot_v4.5-stable_win64.exe
